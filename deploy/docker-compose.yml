@@ -3,7 +3,7 @@
 # Docker Compose 配置
 #
 # Usage / 使用：
-#   1. Create .env: echo "OMBRE_API_KEY=your-key" > .env
+#   1. Create .env: echo "OMBRE_COMPRESS_API_KEY=your-key" > .env
 #      创建 .env 文件
 #   2. docker-compose up -d
 #   3. docker compose logs tunnel (for public URL / 查看公网地址)
@@ -11,14 +11,18 @@
 
 services:
   ombre-brain:
-    build: .
+    build:
+      context: ..
+      dockerfile: Dockerfile
     container_name: ombre-brain
     restart: unless-stopped
     ports:
       - "18001:8000"                        # Local debug port (optional) / 本地调试端口
+    env_file:
+      - .env                                # Load all OMBRE_* vars from deploy/.env
     environment:
-      - OMBRE_API_KEY=${OMBRE_API_KEY}      # From .env file / 从 .env 文件读取
-      - OMBRE_TRANSPORT=streamable-http     # Claude.ai requires streamable-http
+      # These are container-fixed; cannot be overridden via .env.
+      # 容器内固定值，不允许 .env 覆盖。
       - OMBRE_BUCKETS_DIR=/data             # Container-internal bucket path / 容器内路径
     volumes:
       # Mount your Obsidian vault (or any host directory) for persistent storage.
@@ -31,8 +35,8 @@ services:
       # Examples / 示例:
       #   OMBRE_HOST_VAULT_DIR=/path/to/your/Obsidian Vault/Ombre Brain
       #   OMBRE_HOST_VAULT_DIR=~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian Vault/Ombre Brain
-      - ${OMBRE_HOST_VAULT_DIR:-./buckets}:/data
-      - ./config.yaml:/app/config.yaml
+      - ${OMBRE_HOST_VAULT_DIR:-../buckets}:/data
+      - ../config.yaml:/app/config.yaml
 
   # Cloudflare Tunnel (optional) — expose to public internet
   # Cloudflare Tunnel（可选）— 暴露到公网
@@ -48,6 +52,12 @@ services:
       --proxy-keepalive-timeout 300s
       --proxy-connection-timeout 300s
       run
+    environment:
+      # Bypass system proxy for internal Docker hostnames so cloudflared
+      # connects to ombre-brain directly instead of routing through the
+      # host system proxy (e.g. Clash / any local proxy on the host).
+      - NO_PROXY=ombre-brain,localhost,127.0.0.1
+      - no_proxy=ombre-brain,localhost,127.0.0.1
     volumes:
       - ~/.cloudflared:/etc/cloudflared
     depends_on:

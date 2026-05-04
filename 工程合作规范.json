@@ -1,0 +1,156 @@
+{
+  "decision_gates": {
+    "must_stop_and_ask": [
+      {
+        "trigger": "philosophical_boundary",
+        "description": "无法判断某个决定是否符合项目哲学时",
+        "rule": "停下来提出问题，等对齐后再继续，不能用假设代替沟通"
+      },
+      {
+        "trigger": "philosophy_undocumented",
+        "description": "发现项目没有明确记录哲学边界时",
+        "rule": "主动提醒合作者，说明当前发现的哲学，确认后写入该项目的rule.md，不能在哲学模糊的情况下继续推进"
+      },
+      {
+        "trigger": "structural_change",
+        "description": "涉及新建文件、新建模块、改变现有文件职责边界时",
+        "rule": "先提出来确认位置和职责，不能自己猜"
+      },
+      {
+        "trigger": "confirmation_required",
+        "description": "每次改动完成后必须在当前对话里明确告知",
+        "required_fields": [
+          "文件夹路径",
+          "具体文件名",
+          "改动的起止行号",
+          "代码层面改了什么（代码语言描述）",
+          "自然语言层面改了什么（人话描述）",
+          "为什么这样改"
+        ],
+        "rule": "不能只说已完成，六项必须全部在对话里出现"
+      }
+    ],
+    "before_any_work": [
+      {
+        "rule": "通读项目结构再开始",
+        "description": "每次开始工作前必须先读项目结构，不能假设某个文件承担所有职责",
+        "anti_pattern": "想当然认为server.py是所有代码的集合"
+      },
+      {
+        "rule": "参考项目已有实现方式",
+        "description": "开始写代码前必须先看项目里同类功能的已有实现，参考其模式、命名、结构风格，不能引入与项目现有风格冲突的新写法",
+        "purpose": "保持代码库内部一致性，避免同一个项目出现多套风格"
+      },
+      {
+        "rule": "新功能新建，旧功能原地改",
+        "description": "实现新功能必然新建文件或文件夹；迭代旧功能在原有文件内新增或删改，不混用"
+      },
+      {
+        "rule": "改动前声明依赖",
+        "description": "本次改动用到的所有环境变量和路径必须在开始时写明"
+      },
+      {
+        "rule": "读文件头再读代码块",
+        "description": "不能只用正则索引具体代码块，必须先读文件开头的功能说明和指引，再定位具体实现"
+      }
+    ],
+    "can_proceed_autonomously": "工程实现细节，不涉及上述触发点时"
+  },
+
+  "execution": {
+    "workflow": [
+      "按需求文档逐条实现，完成一条标记一条，不跳步",
+      "不自行扩展需求范围，范围变化必须经过对齐",
+      "临时脚本和调试工具用完立即删除，不提交"
+    ],
+    "cross_round_artifacts": {
+      "rule": "跨轮次中间产物必须落实到文件中",
+      "what_counts": [
+        "审计清单（超过5条的）",
+        "本轮决策结果",
+        "待办/未完成项",
+        "需要下一轮继续的任何内容"
+      ],
+      "where": "项目根目录，文件名格式：tmp_<日期>_<简短描述>.md，例如：tmp_0502_audit_taskC.md",
+      "when_to_delete": "本轮任务全部完成、内容已同步进rule.md或其他正式文档后删除",
+      "sync": "内容最终结论必须同步进rule.md对应章节，tmp文件只是过渡，不是存档",
+      "anti_pattern": "重要清单只写在对话里，compact后找不到，下一轮要从transcript恢复"
+    },
+    "testing": {
+      "fast_check": {
+        "command": "pytest tests/ -x --tb=short -q",
+        "when": "每次改动后必跑",
+        "purpose": "确认逻辑层没有破坏"
+      },
+      "full_check": {
+        "command": "docker compose build --no-cache && docker compose up -d",
+        "when": "功能实现完成后必跑",
+        "purpose": "确认功能在真实环境里跑通"
+      },
+      "debugging": {
+        "method": "优先看log定位问题，不靠猜测",
+        "rule": "full_check失败后先看log，再动代码"
+      }
+    },
+    "reporting": {
+      "rule": "测试全绿后才汇报完成，未绿不汇报",
+      "format": {
+        "completed": "列出完成项",
+        "pending": "列出待确认项"
+      }
+    },
+    "code_quality": {
+      "type_annotations": "每个函数必须有参数和返回值的类型注解",
+      "error_handling": {
+        "rule": "所有异常必须被捕获、记录、返回有意义的错误信息",
+        "forbidden": "except: pass / 静默吞掉异常",
+        "degradation": "降级行为必须是显式设计决定，代码注释里写明为什么允许降级，没有注释的降级视为bug"
+      },
+      "dead_code": "注释掉的代码块、调试用print、临时逻辑，完成后必须清理，不得提交"
+    }
+  },
+
+  "communication": {
+    "format": {
+      "preferred": "分点陈述",
+      "avoided": ["表格", "过度格式化"],
+      "language": "简洁自然语言，能一句话说清楚的不用两句"
+    },
+    "reporting": {
+      "completed": "列出完成项",
+      "pending": "列出待确认项，用问句提出"
+    }
+  },
+
+  "traceability": {
+    "in_conversation": {
+      "rule": "每次改动必须在当前对话里明确告知",
+      "required_fields": [
+        "文件夹路径",
+        "具体文件名",
+        "改动的起止行号",
+        "代码层面改了什么",
+        "自然语言层面改了什么",
+        "为什么这样改"
+      ]
+    },
+    "in_code": {
+      "rule": "每个文件开头必须有功能说明",
+      "format": "说明这个文件是什么、做什么、不做什么、对外暴露什么",
+      "purpose": "让未来的任何人包括未来的模型能看到当时的判断依据，而不只是结果"
+    },
+    "anti_pattern": "只说已完成，不说在哪里、为什么"
+  },
+
+  "philosophy": {
+    "alignment_first": {
+      "rule": "提示词是对齐的产物，不是起点",
+      "description": "在提示词出现之前，必须有一个对齐的过程：说想法，一起想清楚，共识之后再落笔。跳过对齐直接写提示词，是在假装已经想好了"
+    },
+    "do_not_end_conversation": {
+      "rule": "不主动结束对话",
+      "how": "需要等待、需要确认、需要提问时，使用question工具，不结束会话",
+      "why": "当前计费逻辑按对话次数扣费，结束对话即扣一次；question工具不触发结束，下个月切换token计费后此条可以重新评估"
+    }
+  }
+}

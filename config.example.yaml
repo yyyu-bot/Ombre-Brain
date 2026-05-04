@@ -45,7 +45,7 @@ dehydration:
   #   LM Studio:   http://localhost:1234/v1
   #   vLLM:        http://localhost:8000/v1
   #   Gemini:      https://generativelanguage.googleapis.com/v1beta/openai
-  # api_key: ""    # ⚠️ Use env var OMBRE_API_KEY instead / 请使用环境变量 OMBRE_API_KEY
+  # api_key: ""    # ⚠️ Use env var OMBRE_COMPRESS_API_KEY instead / 请使用环境变量 OMBRE_COMPRESS_API_KEY
   max_tokens: 1024
   temperature: 0.1
 
@@ -61,16 +61,20 @@ decay:
     arousal_boost: 0.8            # Arousal boost coefficient / 唤醒度加成系数
 
 # --- Embedding / 向量化配置 ---
-# Uses embedding API for semantic similarity search
-# 通过 embedding API 实现语义相似度搜索
-# You can configure embedding independently from dehydration.
-# If api_key is omitted, reuses the same API key (OMBRE_API_KEY) and base_url from dehydration config
-# 你可以把 embedding 独立配置；若 api_key 留空，复用脱水配置的 API key 和 base_url
+# Two backends: `local` (default, fastembed bge-m3 ONNX, ~600-800MB auto-downloaded)
+#               `api`   (any OpenAI-compatible endpoint, requires OMBRE_EMBED_API_KEY)
+# 两种后端：local（默认，本地 fastembed bge-m3 ONNX，约 600-800MB 首次启动自动下载）
+#          api（任意 OpenAI 兼容 endpoint，需要 OMBRE_EMBED_API_KEY）
+# Switch in Dashboard → Settings → Embedding → "切换 / 重算所有 embedding…"
+# (does backup + checkpoint + rate-limited re-embed of all buckets).
+# Old literal values `gemini` / `bge-m3` / `bge-small-zh` still accepted
+# (auto-mapped to `api` / `local` / `local`).
 embedding:
   enabled: true                   # Enable embedding / 启用向量化
-  model: "gemini-embedding-001"   # Embedding model / 向量化模型
+  backend: "local"                # local | api
+  model: "BAAI/bge-m3"            # local 后端固定走 bge-m3；api 后端填云端模型名（如 gemini-embedding-001）
   # base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
-  # api_key: ""                  
+  # api_key: ""                   # Use OMBRE_EMBED_API_KEY / 使用 OMBRE_EMBED_API_KEY
 
 # --- Scoring weights / 检索权重参数 ---
 # total = topic(×4) + emotion(×2) + time(×1.5) + importance(×1)
@@ -84,6 +88,42 @@ scoring_weights:
 matching:
   fuzzy_threshold: 50             # Minimum match score (0-100) / 最低匹配分数
   max_results: 5                  # Max results per search / 单次搜索最多返回条数
+
+# --- Surfacing defaults / 浮现默认参数 ---
+# Defaults applied when Claude calls breath() without explicit caps.
+# Front-end Settings panel writes the same fields back here.
+# Claude 调用 breath() 不显式传 max_* 时使用这些默认；前端「浮现默认参数」面板会回写到这里。
+surfacing:
+  breath_max_results: 20          # 1-50, hard cap of buckets returned per breath
+  breath_max_tokens: 10000        # 500-20000, total token cap per breath
+  feel_max_tokens: 6000           # 500-20000, full-text budget for feel history; older feels collapse to one-line summaries
+  # iter 1.8: weighted sampling for breath surfacing mode（无参数浮现）
+  # 加权采样：从 top_k 候选里按 score**(1/temperature) 抽 sample_k 个，让"想起"带轻微随机性。
+  # 测试 fixture 里默认关 (enabled=false)，保证排序确定。生产可以开。
+  sampling:
+    enabled: false                # true = 启用加权采样；false = 退化为 top1+shuffle 原行为
+    top_k: 5                      # 候选池大小
+    sample_k: 2                   # 抽出几个
+    temperature: 0.7              # >1 更平均、<1 更偏向高分；0.7 是个温和的默认
+
+# --- Limits / 边界限制（iter 1.6 §5）---
+# Single-bucket size cap and pinned bucket quota. Exceeding either is
+# rejected at hold/grow/trace boundaries with a Chinese hint string.
+# 单桶字节上限 + pinned 桶数量上限。超出时在 hold/grow/trace 入口直接拒绝。
+limits:
+  max_bucket_bytes: 51200         # 50KB; 0 disables check
+  max_pinned: 20                  # max pinned buckets; 0 disables check
+
+# --- iter 1.9 G: 桶类型默认值 / per-type frontmatter defaults ---
+# Applied at create() time only when caller doesn't pass that field.
+# 写入时若调用方未显式传入对应字段，使用此处默认值。
+# 设计意图：letter 天然有重量、信件天然不该被静音；plan 默认中等承诺。
+bucket_type_defaults:
+  letter:
+    weight: 1.0
+    dont_surface: false
+  plan:
+    weight: 0.5
 
 # --- Obsidian wikilinks / Obsidian 双链自动注入 ---
 wikilink:

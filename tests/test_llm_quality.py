@@ -16,8 +16,8 @@ import pytest
 
 # Skip all tests if no API key
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("OMBRE_API_KEY"),
-    reason="OMBRE_API_KEY not set — skipping LLM quality tests"
+    not os.environ.get("OMBRE_COMPRESS_API_KEY"),
+    reason="OMBRE_COMPRESS_API_KEY not set — skipping LLM quality tests"
 )
 
 

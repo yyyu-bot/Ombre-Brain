@@ -18,6 +18,8 @@ def _resolve_vault_dir() -> str:
     if env_dir:
         return os.path.expanduser(env_dir)
     try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
         from utils import load_config
         return load_config()["buckets_dir"]
     except Exception:

@@ -3,11 +3,12 @@ __pycache__/
 *.pyo
 .env
 .venv/
-.claude/settings.local.json
-.claude/hooks/__pycache__/
+venv/
+.claude/
 .vscode/
 config.yaml
 buckets/
+test_buckets/
 *.log
 server.log
 plan.md
@@ -16,6 +17,15 @@ backup_*/
 *.db
 import_state.json
 data/
+
+# 内部沟通 / 设计稿 / 复盘 / 迭代 spec —— 不上传
+# Internal design docs, reflections, iteration specs — local only
+docs/internal/
+
+# 测试 & 维护工具 —— 不上传（需要时本地维护）
 tests/integration/
 tests/regression/
 tests/unit/
+tools/
+
+rule.md

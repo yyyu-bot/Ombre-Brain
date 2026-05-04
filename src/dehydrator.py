@@ -1,26 +1,27 @@
-# ============================================================
-# Module: Dehydration & Auto-tagging (dehydrator.py)
-# 模块：数据脱水压缩 + 自动打标
-#
-# Capabilities:
-# 能力：
-#   1. Dehydrate: compress memory content into high-density summaries (save tokens)
-#      脱水：将记忆桶的原始内容压缩为高密度摘要，省 token
-#   2. Merge: blend old and new content, keeping bucket size constant
-#      合并：揉合新旧内容，控制桶体积恒定
-#   3. Analyze: auto-analyze content for domain/emotion/tags
-#      打标：自动分析内容，输出主题域/情感坐标/标签
-#
-# Operating modes:
-# 工作模式：
-#   - API only: OpenAI-compatible API (DeepSeek/Ollama/LM Studio/vLLM/Gemini etc.)
-#     仅 API：通过 OpenAI 兼容客户端调用 LLM API
-#   - Dehydration cache: SQLite persistent cache to avoid redundant API calls
-#     脱水缓存：SQLite 持久缓存，避免重复调用 API
-#
-# Depended on by: server.py
-# 被谁依赖：server.py
-# ============================================================
+"""
+========================================
+dehydrator.py — 调用 LLM 做「脱水压缩 / 合并 / 打标 / 拆分」
+========================================
+
+这个文件包住对外部 LLM 的所有 prompt 和调用。tools/hold、tools/grow、
+tools/dream 等都通过它来「让模型做内容理解」，自身不直接拼 prompt。
+
+关键行为：
+- dehydrate(content)：把长内容压成高密度摘要，省 token
+- merge(old, new)：揉合新旧内容并保持桶体积大致恒定
+- analyze(content)：返回 {domain, valence, arousal, tags, suggested_name, importance}
+- digest(content)：把日记/长文拆成 2~6 条独立条目（grow 用）
+- 走 OpenAI 兼容客户端（DeepSeek / Ollama / LM Studio / vLLM / Gemini 都行）
+- SQLite 缓存脱水结果，避免对相同内容重复调用 API
+
+不做什么（边界）：
+- 不读写记忆桶文件（不知道 bucket 是什么形态）
+- 不决定何时调用、不做去重判断（hold/grow 决定）
+- 没 API key 时不报错，返回降级结果（让上层决定怎么办）
+
+对外暴露：Dehydrator 类（dehydrate / merge / analyze / digest）和默认 prompt 字符串
+========================================
+"""
 
 
 import os
@@ -29,12 +30,61 @@ import json
 import hashlib
 import sqlite3
 import logging
+from typing import Optional
 
 from openai import AsyncOpenAI
 
 from utils import count_tokens_approx
 
 logger = logging.getLogger("ombre_brain.dehydrator")
+
+
+# ============================================================
+# 调参面板 / Tunable constants
+# ------------------------------------------------------------
+# rule.md §①：禁裸魔法数字。这些原本散在五个 _api_* 方法中，
+# 集中后调参一眼看完；prompt 模板本身仍在下面以可读性优先。
+# ============================================================
+
+# --- LLM 默认参数 ---
+_DEFAULT_MODEL = "deepseek-chat"
+_DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
+_DEFAULT_MAX_TOKENS = 1024
+_DEFAULT_TEMPERATURE = 0.1
+_API_TIMEOUT_SECONDS = 60.0
+
+# --- 该多长才需要压缩（低于该 token 数直接走原文）---
+_DEHYDRATE_MIN_TOKENS = 100
+
+# --- 各 API 调用的内容截断上限（防 prompt token 超范围）---
+_DEHYDRATE_INPUT_LIMIT = 3000
+_MERGE_INPUT_LIMIT = 2000     # 新旧各一份
+_ANALYZE_INPUT_LIMIT = 2000
+_DIGEST_INPUT_LIMIT = 5000    # 一天的日记量较大
+_PLAN_JUDGE_INPUT_LIMIT = 1500  # plan 与 new event 各一份
+
+# --- 各专用调用的 max_tokens 覆盖 ---
+_ANALYZE_MAX_TOKENS = 256       # JSON 不大，多了会浪费
+_DIGEST_MAX_TOKENS = 2048       # 2~6 条加起来占位多
+_PLAN_JUDGE_MAX_TOKENS = 200
+_PLAN_JUDGE_TEMPERATURE = 0.0   # 判定需确定性
+_DIGEST_TEMPERATURE = 0.0       # 拆条需确定性
+
+# --- 默认情感坐标（与 bucket_manager 中保持一致）---
+_DEFAULT_VALENCE = 0.5  # 0=极负, 1=极正
+_DEFAULT_AROUSAL = 0.3  # 0=完全平静, 1=极激动
+
+# --- 输出截断长度 ---
+_TAGS_MAX = 15           # tags 最多保留几个
+_DOMAIN_MAX = 3          # domain 最多保留几个（rule.md 推荐选 1~2 个）
+_NAME_MAX_CHARS = 20     # suggested_name 上限
+_PLAN_REASON_MAX = 200   # plan 判定 reason 上限
+_PARSE_ERR_PREVIEW = 200  # JSON 解析失败时日志中 raw 预览长度
+
+# --- importance 范围（与哲学边界一致）---
+_IMPORTANCE_MIN = 1
+_IMPORTANCE_MAX = 10
+_DEFAULT_IMPORTANCE = 5
 
 
 # --- Dehydration prompt: instructs cheap LLM to compress information ---
@@ -165,24 +215,23 @@ class Dehydrator:
         # --- Read dehydration API config / 读取脱水 API 配置 ---
         dehy_cfg = config.get("dehydration", {})
         self.api_key = dehy_cfg.get("api_key", "")
-        self.model = dehy_cfg.get("model", "deepseek-chat")
-        self.base_url = dehy_cfg.get("base_url", "https://api.deepseek.com/v1")
-        self.max_tokens = dehy_cfg.get("max_tokens", 1024)
-        self.temperature = dehy_cfg.get("temperature", 0.1)
+        self.model = dehy_cfg.get("model", _DEFAULT_MODEL)
+        self.base_url = dehy_cfg.get("base_url", _DEFAULT_BASE_URL)
+        self.max_tokens = dehy_cfg.get("max_tokens", _DEFAULT_MAX_TOKENS)
+        self.temperature = dehy_cfg.get("temperature", _DEFAULT_TEMPERATURE)
 
         # --- API availability / 是否有可用的 API ---
         self.api_available = bool(self.api_key)
 
         # --- Initialize OpenAI-compatible client ---
         # --- 初始化 OpenAI 兼容客户端 ---
+        self.client: Optional[AsyncOpenAI] = None
         if self.api_available:
             self.client = AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
-                timeout=60.0,
+                timeout=_API_TIMEOUT_SECONDS,
             )
-        else:
-            self.client = None
 
         # --- SQLite dehydration cache ---
         # --- SQLite 脱水缓存：content hash → summary ---
@@ -236,12 +285,96 @@ class Dehydrator:
         conn.close()
 
     # ---------------------------------------------------------
+    # 内部 helpers / Internal helpers
+    # ---------------------------------------------------------
+    def _require_api(self) -> None:
+        """API 不可用时抛出统一文案的 RuntimeError。
+
+        原本 dehydrate / merge / analyze / digest 各处都重复
+        `if not self.api_available: raise RuntimeError("...")`，
+        统一后调用方一行 `self._require_api()` 即可，且文案改一处全部生效。
+        """
+        if not self.api_available:
+            raise RuntimeError("脱水 API 不可用，请检查 config.yaml 中的 dehydration 配置")
+
+    async def _chat(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """统一的 OpenAI-compatible chat 调用。
+
+        原本 5 个 _api_* 方法重复了同样的样板：
+          * 构造 messages
+          * 调 client.chat.completions.create
+          * 检查 response.choices 非空
+          * 取 choices[0].message.content 并兜底空字符串
+        统一后：
+          * 调用方传入 system + user prompt 与可选的 max_tokens / temperature
+          * 默认值取 self.max_tokens / self.temperature（由 config.yaml 决定）
+          * 始终返回 str（response 异常时返回空串，调用方各自决策）
+
+        参数：
+            system, user — Chat completion 的 system/user 消息
+            max_tokens   — 覆盖默认（如 analyze 用 256，digest 用 2048）
+            temperature  — 覆盖默认（如 digest / plan_judge 需要 0.0）
+        """
+        if self.client is None:
+            return ""
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens if max_tokens is not None else self.max_tokens,
+            temperature=temperature if temperature is not None else self.temperature,
+        )
+        if not response.choices:
+            return ""
+        return response.choices[0].message.content or ""
+
+    @staticmethod
+    def _strip_md_fence(raw: str) -> str:
+        """剥掉 LLM 偶尔会包的 ```...``` 代码块外壳。
+
+        DeepSeek / Gemini 在被要求"返回纯 JSON"时仍偶尔把 JSON 包进
+        ```json\n{...}\n``` 里。三处 JSON 解析都得做这层剥离，
+        所以统一抽到这里。原始字符串不含围栏时原样返回。
+        """
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+        return cleaned
+
+    @staticmethod
+    def _clamp_va(
+        meta: dict,
+        default_v: float = _DEFAULT_VALENCE,
+        default_a: float = _DEFAULT_AROUSAL,
+    ) -> tuple[float, float]:
+        """读取 meta 中的 valence / arousal 并钳制到 [0, 1]。
+
+        三处 LLM 返回校验逻辑相同（_format_output / _parse_analysis / _parse_digest），
+        集中后保证三处行为一致：解析失败一律回 (默认 V, 默认 A)。
+        """
+        try:
+            v = max(0.0, min(1.0, float(meta.get("valence", default_v))))
+            a = max(0.0, min(1.0, float(meta.get("arousal", default_a))))
+            return v, a
+        except (ValueError, TypeError):
+            return default_v, default_a
+
+    # ---------------------------------------------------------
     # Dehydrate: compress raw content into concise summary
     # 脱水：将原始内容压缩为精简摘要
     # API only (no local fallback)
     # 仅通过 API 脱水（无本地回退）
     # ---------------------------------------------------------
-    async def dehydrate(self, content: str, metadata: dict = None) -> str:
+    async def dehydrate(self, content: str, metadata: Optional[dict] = None) -> str:
         """
         Dehydrate/compress memory content.
         Returns formatted summary string ready for Claude context injection.
@@ -255,7 +388,7 @@ class Dehydrator:
 
         # --- Content is short enough, no compression needed ---
         # --- 内容已经很短，不需要压缩 ---
-        if count_tokens_approx(content) < 100:
+        if count_tokens_approx(content) < _DEHYDRATE_MIN_TOKENS:
             return self._format_output(content, metadata)
 
         # --- Check cache first ---
@@ -266,8 +399,7 @@ class Dehydrator:
 
         # --- API dehydration (no local fallback) ---
         # --- API 脱水（无本地降级）---
-        if not self.api_available:
-            raise RuntimeError("脱水 API 不可用，请配置 OMBRE_API_KEY")
+        self._require_api()
 
         result = await self._api_dehydrate(content)
         # --- Cache the result ---
@@ -291,8 +423,7 @@ class Dehydrator:
             return old_content
 
         # --- API merge (no local fallback) ---
-        if not self.api_available:
-            raise RuntimeError("脱水 API 不可用，请检查 config.yaml 中的 dehydration 配置")
+        self._require_api()
         try:
             result = await self._api_merge(old_content, new_content)
             if result:
@@ -312,18 +443,7 @@ class Dehydrator:
         Call LLM API for intelligent dehydration (via OpenAI-compatible client).
         调用 LLM API 执行智能脱水。
         """
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": DEHYDRATE_PROMPT},
-                {"role": "user", "content": content[:3000]},
-            ],
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-        )
-        if not response.choices:
-            return ""
-        return response.choices[0].message.content or ""
+        return await self._chat(DEHYDRATE_PROMPT, content[:_DEHYDRATE_INPUT_LIMIT])
 
     # ---------------------------------------------------------
     # API call: merge
@@ -334,21 +454,11 @@ class Dehydrator:
         Call LLM API for intelligent merge (via OpenAI-compatible client).
         调用 LLM API 执行智能合并。
         """
-        user_msg = f"旧记忆：\n{old_content[:2000]}\n\n新内容：\n{new_content[:2000]}"
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": MERGE_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
+        user_msg = (
+            f"旧记忆：\n{old_content[:_MERGE_INPUT_LIMIT]}\n\n"
+            f"新内容：\n{new_content[:_MERGE_INPUT_LIMIT]}"
         )
-        if not response.choices:
-            return ""
-        return response.choices[0].message.content or ""
-
-
+        return await self._chat(MERGE_PROMPT, user_msg)
 
     # ---------------------------------------------------------
     # Output formatting
@@ -356,7 +466,8 @@ class Dehydrator:
     # Wraps dehydrated result with bucket name, tags, emotion coords
     # 把脱水结果包装成带桶名、标签、情感坐标的可读文本
     # ---------------------------------------------------------
-    def _format_output(self, content: str, metadata: dict = None) -> str:
+
+    def _format_output(self, content: str, metadata: Optional[dict] = None) -> str:
         """
         Format dehydrated result into context-injectable text.
         将脱水结果格式化为可注入上下文的文本。
@@ -365,11 +476,7 @@ class Dehydrator:
         if metadata and isinstance(metadata, dict):
             name = metadata.get("name", "未命名")
             domains = ", ".join(metadata.get("domain", []))
-            try:
-                valence = float(metadata.get("valence", 0.5))
-                arousal = float(metadata.get("arousal", 0.3))
-            except (ValueError, TypeError):
-                valence, arousal = 0.5, 0.3
+            valence, arousal = self._clamp_va(metadata)
             header = f"📌 记忆桶: {name}"
             if domains:
                 header += f" [主题:{domains}]"
@@ -384,7 +491,15 @@ class Dehydrator:
             if metadata.get("digested"):
                 header += " [已消化]"
             header += "\n"
-        
+
+        # 去掉 keywords 字段：LLM 返回的 JSON 里 keywords 是内部索引用途，不暴露给上下文
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict) and "keywords" in parsed:
+                parsed.pop("keywords", None)
+                content = json.dumps(parsed, ensure_ascii=False)
+        except Exception:
+            pass  # 非 JSON 内容直接透传
         content = re.sub(r'\[\[([^\]]+)\]\]', r'\1', content)
         return f"{header}{content}"
 
@@ -405,8 +520,7 @@ class Dehydrator:
             return self._default_analysis()
 
         # --- API analyze (no local fallback) ---
-        if not self.api_available:
-            raise RuntimeError("脱水 API 不可用，请检查 config.yaml 中的 dehydration 配置")
+        self._require_api()
         try:
             result = await self._api_analyze(content)
             if result:
@@ -426,18 +540,12 @@ class Dehydrator:
         Call LLM API for content analysis / tagging.
         调用 LLM API 执行内容分析打标。
         """
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": ANALYZE_PROMPT},
-                {"role": "user", "content": content[:2000]},
-            ],
-            max_tokens=256,
-            temperature=0.1,
+        raw = await self._chat(
+            ANALYZE_PROMPT,
+            content[:_ANALYZE_INPUT_LIMIT],
+            max_tokens=_ANALYZE_MAX_TOKENS,
+            temperature=_DEFAULT_TEMPERATURE,
         )
-        if not response.choices:
-            return self._default_analysis()
-        raw = response.choices[0].message.content or ""
         if not raw.strip():
             return self._default_analysis()
         return self._parse_analysis(raw)
@@ -453,32 +561,24 @@ class Dehydrator:
         解析并校验 API 返回的打标结果。
         """
         try:
-            # Handle potential markdown code block wrapping
-            # 处理可能的 markdown 代码块包裹
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+            cleaned = self._strip_md_fence(raw)
             result = json.loads(cleaned)
         except (json.JSONDecodeError, IndexError, ValueError):
-            logger.warning(f"API tagging JSON parse failed / JSON 解析失败: {raw[:200]}")
+            logger.warning(f"API tagging JSON parse failed / JSON 解析失败: {raw[:_PARSE_ERR_PREVIEW]}")
             return self._default_analysis()
 
         if not isinstance(result, dict):
             return self._default_analysis()
 
         # --- Validate and clamp value ranges / 校验并钳制数值范围 ---
-        try:
-            valence = max(0.0, min(1.0, float(result.get("valence", 0.5))))
-            arousal = max(0.0, min(1.0, float(result.get("arousal", 0.3))))
-        except (ValueError, TypeError):
-            valence, arousal = 0.5, 0.3
+        valence, arousal = self._clamp_va(result)
 
         return {
-            "domain": result.get("domain", ["未分类"])[:3],
+            "domain": result.get("domain", ["未分类"])[:_DOMAIN_MAX],
             "valence": valence,
             "arousal": arousal,
-            "tags": result.get("tags", [])[:15],
-            "suggested_name": str(result.get("suggested_name", ""))[:20],
+            "tags": result.get("tags", [])[:_TAGS_MAX],
+            "suggested_name": str(result.get("suggested_name", ""))[:_NAME_MAX_CHARS],
         }
 
     # ---------------------------------------------------------
@@ -492,8 +592,8 @@ class Dehydrator:
         """
         return {
             "domain": ["未分类"],
-            "valence": 0.5,
-            "arousal": 0.3,
+            "valence": _DEFAULT_VALENCE,
+            "arousal": _DEFAULT_AROUSAL,
             "tags": [],
             "suggested_name": "",
         }
@@ -515,8 +615,7 @@ class Dehydrator:
             return []
 
         # --- API digest (no local fallback) ---
-        if not self.api_available:
-            raise RuntimeError("脱水 API 不可用，请检查 config.yaml 中的 dehydration 配置")
+        self._require_api()
         try:
             result = await self._api_digest(content)
             if result:
@@ -536,18 +635,12 @@ class Dehydrator:
         Call LLM API for diary organization.
         调用 LLM API 执行日记整理。
         """
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": DIGEST_PROMPT},
-                {"role": "user", "content": content[:5000]},
-            ],
-            max_tokens=2048,
-            temperature=0.0,
+        raw = await self._chat(
+            DIGEST_PROMPT,
+            content[:_DIGEST_INPUT_LIMIT],
+            max_tokens=_DIGEST_MAX_TOKENS,
+            temperature=_DIGEST_TEMPERATURE,
         )
-        if not response.choices:
-            return []
-        raw = response.choices[0].message.content or ""
         if not raw.strip():
             return []
         return self._parse_digest(raw)
@@ -562,12 +655,10 @@ class Dehydrator:
         解析并校验 API 返回的日记整理结果。
         """
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+            cleaned = self._strip_md_fence(raw)
             items = json.loads(cleaned)
         except (json.JSONDecodeError, IndexError, ValueError):
-            logger.warning(f"Diary digest JSON parse failed / JSON 解析失败: {raw[:200]}")
+            logger.warning(f"Diary digest JSON parse failed / JSON 解析失败: {raw[:_PARSE_ERR_PREVIEW]}")
             return []
 
         if not isinstance(items, list):
@@ -578,22 +669,64 @@ class Dehydrator:
             if not isinstance(item, dict) or not item.get("content"):
                 continue
             try:
-                importance = max(1, min(10, int(item.get("importance", 5))))
+                importance = max(
+                    _IMPORTANCE_MIN,
+                    min(_IMPORTANCE_MAX, int(item.get("importance", _DEFAULT_IMPORTANCE))),
+                )
             except (ValueError, TypeError):
-                importance = 5
-            try:
-                valence = max(0.0, min(1.0, float(item.get("valence", 0.5))))
-                arousal = max(0.0, min(1.0, float(item.get("arousal", 0.3))))
-            except (ValueError, TypeError):
-                valence, arousal = 0.5, 0.3
+                importance = _DEFAULT_IMPORTANCE
+            valence, arousal = self._clamp_va(item)
 
             validated.append({
-                "name": str(item.get("name", ""))[:20],
+                "name": str(item.get("name", ""))[:_NAME_MAX_CHARS],
                 "content": str(item.get("content", "")),
-                "domain": item.get("domain", ["未分类"])[:3],
+                "domain": item.get("domain", ["未分类"])[:_DOMAIN_MAX],
                 "valence": valence,
                 "arousal": arousal,
-                "tags": item.get("tags", [])[:15],
+                "tags": item.get("tags", [])[:_TAGS_MAX],
                 "importance": importance,
             })
         return validated
+
+    # ---------------------------------------------------------
+    # API call: judge whether a new event resolves an active plan
+    # API 调用：判断新事件是否完成了某个 active plan
+    # ---------------------------------------------------------
+    async def judge_plan_resolution(self, plan_text: str, new_event_text: str) -> dict:
+        """
+        Conservative judgement (鼓励漏报，避免误报).
+        保守判断：仅在新事件明确表示 plan 已完成时返回 resolved=True。
+        Returns: {"resolved": bool, "confidence": float, "reason": str}
+        Returns {"resolved": False} silently when API unavailable.
+        """
+        if not self.client:
+            return {"resolved": False, "confidence": 0.0, "reason": "API 不可用"}
+        system = (
+            "你是一个保守的计划完成判断器。给定一条 plan 和一条新事件，"
+            "只在新事件明确表示该 plan 已被完成、放弃或不再相关时，输出 resolved=true；"
+            "其它情况一律 false。返回严格 JSON：{\"resolved\": true/false, \"confidence\": 0~1, \"reason\": \"...\"}。"
+            "不要解释、不要 markdown、不要多余文本。"
+        )
+        user = (
+            f"PLAN:\n{plan_text[:_PLAN_JUDGE_INPUT_LIMIT]}\n\n"
+            f"NEW EVENT:\n{new_event_text[:_PLAN_JUDGE_INPUT_LIMIT]}"
+        )
+        try:
+            raw = await self._chat(
+                system,
+                user,
+                max_tokens=_PLAN_JUDGE_MAX_TOKENS,
+                temperature=_PLAN_JUDGE_TEMPERATURE,
+            )
+            if not raw:
+                return {"resolved": False, "confidence": 0.0, "reason": "空响应"}
+            cleaned = self._strip_md_fence(raw)
+            data = json.loads(cleaned)
+            return {
+                "resolved": bool(data.get("resolved", False)),
+                "confidence": float(data.get("confidence", 0.0)),
+                "reason": str(data.get("reason", ""))[:_PLAN_REASON_MAX],
+            }
+        except Exception as e:
+            logger.warning(f"judge_plan_resolution failed: {e}")
+            return {"resolved": False, "confidence": 0.0, "reason": str(e)}

@@ -1,19 +1,25 @@
-# ============================================================
-# Module: Memory Import Engine (import_memory.py)
-# 模块：历史记忆导入引擎
-#
-# Imports conversation history from various platforms into OB.
-# 将各平台对话历史导入 OB 记忆系统。
-#
-# Supports: Claude JSON, ChatGPT export, DeepSeek, Markdown, plain text
-# 支持格式：Claude JSON、ChatGPT 导出、DeepSeek、Markdown、纯文本
-#
-# Features:
-#   - Chunked processing with resume support
-#   - Progress persistence (import_state.json)
-#   - Raw preservation mode for special contexts
-#   - Post-import frequency pattern detection
-# ============================================================
+"""
+========================================
+import_memory.py — 历史对话导入引擎
+========================================
+
+把各平台导出的历史对话（Claude JSON / ChatGPT / DeepSeek / Markdown / 纯文本）
+切块、过LLM 打标、写入记忆系统。
+
+关键行为：
+- 自动识别格式，分块处理，单 chunk 独立成桶
+- 导入进度持久化到 import_state.json，可断点续传
+- raw 模式：保留原文不脱水，给特殊场景用
+- 导入完成后扫一遍频次模式（同一主题反复出现 → 提示用户 pin）
+
+不做什么（边界）：
+- 不在线接收对话流（只处理离线导出文件）
+- 不写桶文件本身（委托给 BucketManager）
+- 不调用 dehydrator.merge（只新建，不合并）
+
+对外暴露：ImportEngine 类（被 server.py 注入到 _runtime，由 dashboard API 触发）
+========================================
+"""
 
 import os
 import json
@@ -21,10 +27,90 @@ import hashlib
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from utils import count_tokens_approx, now_iso
 
 logger = logging.getLogger("ombre_brain.import")
+
+
+# ============================================================
+# 调参面板 / Tunable constants
+# ------------------------------------------------------------
+# rule.md §①：禁裸魔法数字。导入流水线上下参数集中定义在这里。
+# ============================================================
+
+# --- chunk_turns：对话轮次分窗 ---
+_CHUNK_TARGET_TOKENS = 10000   # 单个 chunk 目标 token 数
+_CHUNK_OVERSIZE_RATIO = 1.5    # 单轮 × 该倍数 → 单独成 chunk（避免超范围）
+
+# --- ImportState ---
+_STATE_HASH_HEX = 16           # source_hash 取 sha256 前 16 hex
+_STATE_ERR_LOG_MAX = 100       # errors 数组最多保留条数（避免状态文件肨胀）
+_CHUNK_ERR_PREVIEW = 200       # 单 chunk 错误信息截断长度
+
+# --- _extract_memories LLM 调用 ---
+_EXTRACT_INPUT_LIMIT = 12000   # chunk 内容传给 LLM 的上限
+_EXTRACT_MAX_TOKENS = 2048
+_EXTRACT_TEMPERATURE = 0.0     # 提取需确定性
+_PARSE_ERR_PREVIEW = 200       # JSON 解析失败时日志预览
+
+# --- 默认情感坐标与 importance（与 dehydrator 保持一致）---
+_DEFAULT_VALENCE = 0.5
+_DEFAULT_AROUSAL = 0.3
+_DEFAULT_IMPORTANCE = 5
+_IMPORTANCE_MIN = 1
+_IMPORTANCE_MAX = 10
+
+# --- 输出截断长度 ---
+_NAME_MAX_CHARS = 20
+_DOMAIN_MAX = 3
+_TAGS_MAX = 10                 # extraction 试在 10 个以内（与 dehydrator 的 15 不同，导入场景信息密度较低）
+
+# --- merge_or_create 默认阈值 ---
+_DEFAULT_MERGE_THRESHOLD = 75
+
+# --- detect_patterns：embedding 聚类 ---
+_PATTERN_MIN_DYNAMIC_BUCKETS = 5  # 动态桶少于该数 → 不作处理
+_PATTERN_SIMILARITY_THRESHOLD = 0.7  # 两桶向量余弦 > 该值 → 归同一类
+_PATTERN_MIN_CLUSTER_SIZE = 3     # 类内成员 ≥ 该数才认为是“高频模式”
+_PATTERN_PIN_SUGGEST_THRESHOLD = 5  # 成员 ≥ 该数 → 建议 pin，否则仅 review
+_PATTERN_RESULT_LIMIT = 20        # 返回给 dashboard 的 pattern 上限
+_PATTERN_CONTENT_PREVIEW = 200    # pattern_content 预览长度
+
+
+def _clamp_va(meta: dict) -> tuple[float, float]:
+    """将 meta 中的 valence / arousal 钳制到 [0, 1]。
+
+    与 dehydrator._clamp_va 同表现，这里单独复制一份是为了避免
+    import_memory 反向依赖 dehydrator 的私有方法。两者默认值一致（
+    rule.md §1.0 哲学：中性 V=0.5 / 低唤醒 A=0.3）。
+    """
+    try:
+        v = max(0.0, min(1.0, float(meta.get("valence", _DEFAULT_VALENCE))))
+        a = max(0.0, min(1.0, float(meta.get("arousal", _DEFAULT_AROUSAL))))
+        return v, a
+    except (ValueError, TypeError):
+        return _DEFAULT_VALENCE, _DEFAULT_AROUSAL
+
+
+def _clamp_importance(meta: dict) -> int:
+    """将 meta.importance 钳制到 [1, 10]。解析失败返回默认 5。"""
+    try:
+        return max(
+            _IMPORTANCE_MIN,
+            min(_IMPORTANCE_MAX, int(meta.get("importance", _DEFAULT_IMPORTANCE))),
+        )
+    except (ValueError, TypeError):
+        return _DEFAULT_IMPORTANCE
+
+
+def _strip_md_fence(raw: str) -> str:
+    """剥掉 LLM 偊尔会包的 ```...``` 代码块外壳（与 dehydrator 内部同款）。"""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+    return cleaned
 
 
 # ============================================================
@@ -96,7 +182,7 @@ def _parse_chatgpt_json(data: list | dict) -> list[dict]:
             for msg in messages:
                 if not isinstance(msg, dict):
                     continue
-                content = msg.get("content", msg.get("text", ""))
+                content = str(msg.get("content", msg.get("text", "")) or "")
                 if isinstance(content, dict):
                     content = " ".join(str(p) for p in content.get("parts", []))
                 if not content or not content.strip():
@@ -113,7 +199,7 @@ def _parse_markdown(text: str) -> list[dict]:
     lines = text.split("\n")
     turns = []
     current_role = "user"
-    current_content = []
+    current_content: list[str] = []
 
     for line in lines:
         stripped = line.strip()
@@ -189,26 +275,27 @@ def detect_and_parse(raw_content: str, filename: str = "") -> list[dict]:
 # 分窗 — 按对话轮次边界切为 ~10k token 窗口
 # ============================================================
 
-def chunk_turns(turns: list[dict], target_tokens: int = 10000) -> list[dict]:
+def chunk_turns(turns: list[dict], target_tokens: int = _CHUNK_TARGET_TOKENS, human_label: str = "用户") -> list[dict]:
     """
     Group conversation turns into chunks of ~target_tokens.
     Returns list of {content, timestamp_start, timestamp_end, turn_count}.
     按对话轮次边界将对话分为 ~target_tokens 大小的窗口。
+    human_label：对话中「用户」那一侧的称呼，默认「用户」，可传入 config["human"] 使内容更个人化。
     """
-    chunks = []
-    current_lines = []
+    chunks: list[dict] = []
+    current_lines: list[str] = []
     current_tokens = 0
     first_ts = ""
     last_ts = ""
     turn_count = 0
 
     for turn in turns:
-        role_label = "用户" if turn["role"] in ("user", "human") else "AI"
+        role_label = human_label if turn["role"] in ("user", "human") else "AI"
         line = f"[{role_label}] {turn['content']}"
         line_tokens = count_tokens_approx(line)
 
         # If single turn exceeds target, split it
-        if line_tokens > target_tokens * 1.5:
+        if line_tokens > target_tokens * _CHUNK_OVERSIZE_RATIO:
             # Flush current
             if current_lines:
                 chunks.append({
@@ -271,7 +358,7 @@ class ImportState:
 
     def __init__(self, state_dir: str):
         self.state_file = os.path.join(state_dir, "import_state.json")
-        self.data = {
+        self.data: dict[str, Any] = {
             "source_file": "",
             "source_hash": "",
             "total_chunks": 0,
@@ -428,19 +515,27 @@ class ImportEngine:
         if self._running:
             return {"error": "Import already running"}
 
+        # 预检：LLM API 必须可用，否则所有 chunk 都会静默失败
+        if not self.dehydrator.api_available:
+            return {"error": "LLM API 未配置或不可用，导入需要 OMBRE_COMPRESS_API_KEY。请检查 config.yaml 或环境变量。"}
+
         self._running = True
         self._paused = False
 
         try:
-            source_hash = hashlib.sha256(raw_content.encode()).hexdigest()[:16]
+            source_hash = hashlib.sha256(raw_content.encode()).hexdigest()[:_STATE_HASH_HEX]
 
             # Check for resume
             if resume and self.state.load() and self.state.can_resume:
                 if self.state.data["source_hash"] == source_hash:
-                    logger.info(f"Resuming import from chunk {self.state.data['processed']}/{self.state.data['total_chunks']}")
+                    logger.info(
+                        f"Resuming import from chunk "
+                        f"{self.state.data['processed']}/{self.state.data['total_chunks']}"
+                    )
                     # Re-parse and re-chunk to get the same chunks
                     turns = detect_and_parse(raw_content, filename)
-                    self._chunks = chunk_turns(turns)
+                    _human = self.config.get("human", "用户")
+                    self._chunks = chunk_turns(turns, human_label=_human)
                     self.state.data["status"] = "running"
                     self.state.save()
                     return await self._process_chunks(preserve_raw)
@@ -453,7 +548,8 @@ class ImportEngine:
                 self._running = False
                 return {"error": "No conversation turns found in file"}
 
-            self._chunks = chunk_turns(turns)
+            _human = self.config.get("human", "用户")
+            self._chunks = chunk_turns(turns, human_label=_human)
             if not self._chunks:
                 self._running = False
                 return {"error": "No processable chunks after splitting"}
@@ -487,9 +583,9 @@ class ImportEngine:
             try:
                 await self._process_single_chunk(chunk, preserve_raw)
             except Exception as e:
-                err_msg = f"Chunk {i}: {str(e)[:200]}"
+                err_msg = f"Chunk {i}: {str(e)[:_CHUNK_ERR_PREVIEW]}"
                 logger.warning(f"Import chunk error: {err_msg}")
-                if len(self.state.data["errors"]) < 100:
+                if len(self.state.data["errors"]) < _STATE_ERR_LOG_MAX:
                     self.state.data["errors"].append(err_msg)
 
             self.state.data["processed"] = i + 1
@@ -499,7 +595,10 @@ class ImportEngine:
         self.state.data["status"] = "completed"
         self.state.save()
         self._running = False
-        logger.info(f"Import completed: {self.state.data['memories_created']} created, {self.state.data['memories_merged']} merged")
+        logger.info(
+            f"Import completed: {self.state.data['memories_created']} created, "
+            f"{self.state.data['memories_merged']} merged"
+        )
         return self.state.to_dict()
 
     async def _process_single_chunk(self, chunk: dict, preserve_raw: bool):
@@ -513,8 +612,12 @@ class ImportEngine:
             items = await self._extract_memories(content)
             self.state.data["api_calls"] += 1
         except Exception as e:
-            logger.warning(f"LLM extraction failed: {e}")
+            err_msg = f"LLM extraction failed: {e}"
+            logger.warning(err_msg)
             self.state.data["api_calls"] += 1
+            # 把 LLM 失败原因写入 state.errors，让 /api/import/status 可见
+            if len(self.state.data["errors"]) < _STATE_ERR_LOG_MAX:
+                self.state.data["errors"].append(err_msg)
             return
 
         if not items:
@@ -530,17 +633,13 @@ class ImportEngine:
                     bucket_id = await self.bucket_mgr.create(
                         content=item["content"],
                         tags=item.get("tags", []),
-                        importance=item.get("importance", 5),
+                        importance=item.get("importance", _DEFAULT_IMPORTANCE),
                         domain=item.get("domain", ["未分类"]),
-                        valence=item.get("valence", 0.5),
-                        arousal=item.get("arousal", 0.3),
+                        valence=item.get("valence", _DEFAULT_VALENCE),
+                        arousal=item.get("arousal", _DEFAULT_AROUSAL),
                         name=item.get("name"),
                     )
-                    if self.embedding_engine:
-                        try:
-                            await self.embedding_engine.generate_and_store(bucket_id, item["content"])
-                        except Exception:
-                            pass
+                    await self._safe_embed(bucket_id, item["content"])
                     self.state.data["memories_raw"] += 1
                     self.state.data["memories_created"] += 1
                 else:
@@ -564,14 +663,18 @@ class ImportEngine:
         if not self.dehydrator.api_available:
             raise RuntimeError("API not available")
 
+        # 用 human 配置替换 prompt 里的「用户」称呼，让 LLM 输出更个人化。
+        _human = self.config.get("human", "用户")
+        prompt = IMPORT_EXTRACT_PROMPT.replace("用户", _human) if _human != "用户" else IMPORT_EXTRACT_PROMPT
+
         response = await self.dehydrator.client.chat.completions.create(
             model=self.dehydrator.model,
             messages=[
-                {"role": "system", "content": IMPORT_EXTRACT_PROMPT},
-                {"role": "user", "content": chunk_content[:12000]},
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": chunk_content[:_EXTRACT_INPUT_LIMIT]},
             ],
-            max_tokens=2048,
-            temperature=0.0,
+            max_tokens=_EXTRACT_MAX_TOKENS,
+            temperature=_EXTRACT_TEMPERATURE,
         )
 
         if not response.choices:
@@ -587,12 +690,10 @@ class ImportEngine:
     def _parse_extraction(raw: str) -> list[dict]:
         """Parse and validate LLM extraction result."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+            cleaned = _strip_md_fence(raw)
             items = json.loads(cleaned)
         except (json.JSONDecodeError, IndexError, ValueError):
-            logger.warning(f"Import extraction JSON parse failed: {raw[:200]}")
+            logger.warning(f"Import extraction JSON parse failed: {raw[:_PARSE_ERR_PREVIEW]}")
             return []
 
         if not isinstance(items, list):
@@ -602,23 +703,16 @@ class ImportEngine:
         for item in items:
             if not isinstance(item, dict) or not item.get("content"):
                 continue
-            try:
-                importance = max(1, min(10, int(item.get("importance", 5))))
-            except (ValueError, TypeError):
-                importance = 5
-            try:
-                valence = max(0.0, min(1.0, float(item.get("valence", 0.5))))
-                arousal = max(0.0, min(1.0, float(item.get("arousal", 0.3))))
-            except (ValueError, TypeError):
-                valence, arousal = 0.5, 0.3
+            importance = _clamp_importance(item)
+            valence, arousal = _clamp_va(item)
 
             validated.append({
-                "name": str(item.get("name", ""))[:20],
+                "name": str(item.get("name", ""))[:_NAME_MAX_CHARS],
                 "content": str(item["content"]),
-                "domain": item.get("domain", ["未分类"])[:3],
+                "domain": item.get("domain", ["未分类"])[:_DOMAIN_MAX],
                 "valence": valence,
                 "arousal": arousal,
-                "tags": [str(t) for t in item.get("tags", [])][:10],
+                "tags": [str(t) for t in item.get("tags", [])][:_TAGS_MAX],
                 "importance": importance,
                 "preserve_raw": bool(item.get("preserve_raw", False)),
                 "is_pattern": bool(item.get("is_pattern", False)),
@@ -626,14 +720,29 @@ class ImportEngine:
 
         return validated
 
+    async def _safe_embed(self, bucket_id: str, content: str) -> None:
+        """Fire-and-forget embedding：失败静默，不中断导入主流程。
+
+        4 处需要生成 embedding 的地方都走这个 helper，避免重复的
+        try/except Exception: pass 样板。
+        """
+        if not self.embedding_engine:
+            return
+        try:
+            await self.embedding_engine.generate_and_store(bucket_id, content)
+        except Exception as e:
+            # 降级允许：embedding 失败不影响桶落盘；后续可通过 backfill_embeddings.py 补全。
+            # 参见 rule.md §2.4 / §6 OB-E001。
+            logger.warning(f"_safe_embed: bucket={bucket_id} embedding 生成失败（允许降级）: {e}")
+
     async def _merge_or_create_item(self, item: dict) -> bool:
         """Try to merge with existing bucket, or create new. Returns is_merged."""
         content = item["content"]
         domain = item.get("domain", ["未分类"])
         tags = item.get("tags", [])
-        importance = item.get("importance", 5)
-        valence = item.get("valence", 0.5)
-        arousal = item.get("arousal", 0.3)
+        importance = item.get("importance", _DEFAULT_IMPORTANCE)
+        valence = item.get("valence", _DEFAULT_VALENCE)
+        arousal = item.get("arousal", _DEFAULT_AROUSAL)
         name = item.get("name", "")
 
         try:
@@ -641,7 +750,7 @@ class ImportEngine:
         except Exception:
             existing = []
 
-        merge_threshold = self.config.get("merge_threshold", 75)
+        merge_threshold = self.config.get("merge_threshold", _DEFAULT_MERGE_THRESHOLD)
 
         if existing and existing[0].get("score", 0) > merge_threshold:
             bucket = existing[0]
@@ -649,22 +758,18 @@ class ImportEngine:
                 try:
                     merged = await self.dehydrator.merge(bucket["content"], content)
                     self.state.data["api_calls"] += 1
-                    old_v = bucket["metadata"].get("valence", 0.5)
-                    old_a = bucket["metadata"].get("arousal", 0.3)
+                    old_v = bucket["metadata"].get("valence", _DEFAULT_VALENCE)
+                    old_a = bucket["metadata"].get("arousal", _DEFAULT_AROUSAL)
                     await self.bucket_mgr.update(
                         bucket["id"],
                         content=merged,
                         tags=list(set(bucket["metadata"].get("tags", []) + tags)),
-                        importance=max(bucket["metadata"].get("importance", 5), importance),
+                        importance=max(bucket["metadata"].get("importance", _DEFAULT_IMPORTANCE), importance),
                         domain=list(set(bucket["metadata"].get("domain", []) + domain)),
                         valence=round((old_v + valence) / 2, 2),
                         arousal=round((old_a + arousal) / 2, 2),
                     )
-                    if self.embedding_engine:
-                        try:
-                            await self.embedding_engine.generate_and_store(bucket["id"], merged)
-                        except Exception:
-                            pass
+                    await self._safe_embed(bucket["id"], merged)
                     return True
                 except Exception as e:
                     logger.warning(f"Merge failed during import: {e}")
@@ -680,11 +785,7 @@ class ImportEngine:
             arousal=arousal,
             name=name or None,
         )
-        if self.embedding_engine:
-            try:
-                await self.embedding_engine.generate_and_store(bucket_id, content)
-            except Exception:
-                pass
+        await self._safe_embed(bucket_id, content)
         return False
 
     async def detect_patterns(self) -> list[dict]:
@@ -704,7 +805,7 @@ class ImportEngine:
             and not b["metadata"].get("resolved")
         ]
 
-        if len(dynamic_buckets) < 5:
+        if len(dynamic_buckets) < _PATTERN_MIN_DYNAMIC_BUCKETS:
             return []
 
         # Get embeddings
@@ -714,7 +815,7 @@ class ImportEngine:
             if emb is not None:
                 embeddings[b["id"]] = emb
 
-        if len(embeddings) < 5:
+        if len(embeddings) < _PATTERN_MIN_DYNAMIC_BUCKETS:
             return []
 
         # Find clusters: group by pairwise similarity > 0.7
@@ -742,11 +843,11 @@ class ImportEngine:
                 if norm_b == 0:
                     continue
                 sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
-                if sim > 0.7:
+                if sim > _PATTERN_SIMILARITY_THRESHOLD:
                     cluster.append(id_b)
                     visited.add(id_b)
 
-            if len(cluster) >= 3:
+            if len(cluster) >= _PATTERN_MIN_CLUSTER_SIZE:
                 clusters[id_a] = cluster
 
         # Format results
@@ -756,12 +857,12 @@ class ImportEngine:
             if not lead_bucket:
                 continue
             patterns.append({
-                "pattern_content": lead_bucket["content"][:200],
+                "pattern_content": lead_bucket["content"][:_PATTERN_CONTENT_PREVIEW],
                 "pattern_name": lead_bucket["metadata"].get("name", lead_id),
                 "count": len(cluster_ids),
                 "bucket_ids": cluster_ids,
-                "suggested_action": "pin" if len(cluster_ids) >= 5 else "review",
+                "suggested_action": "pin" if len(cluster_ids) >= _PATTERN_PIN_SUGGEST_THRESHOLD else "review",
             })
 
         patterns.sort(key=lambda p: p["count"], reverse=True)
-        return patterns[:20]
+        return patterns[:_PATTERN_RESULT_LIMIT]

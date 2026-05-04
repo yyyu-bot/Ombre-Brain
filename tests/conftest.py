@@ -16,8 +16,30 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# Ensure project root importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# ------------------------------------------------------------
+# iter 1.8: 必须在任何 src/* 导入之前设置 OMBRE_BUCKETS_DIR
+# iter 1.9 F: 统一推荐 OMBRE_VAULT_DIR；测试也优先用新名
+# Must set OMBRE_VAULT_DIR / OMBRE_BUCKETS_DIR BEFORE any test
+# imports src/server.py, because server.py runs load_config() at
+# import time which mkdirs /data.
+# ------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_TEST_BUCKETS = _REPO_ROOT / "test_buckets"
+_TEST_BUCKETS.mkdir(exist_ok=True)
+if not os.environ.get("OMBRE_VAULT_DIR") and not os.environ.get("OMBRE_BUCKETS_DIR"):
+    # iter 1.9 F: 设两个变量同步指向同一目录，避免某个测试用 monkeypatch 覆盖单个变量
+    # 时被另一个变量「卡住」。两者都指向 test_buckets 时，谁优先都不影响测试结果。
+    os.environ["OMBRE_VAULT_DIR"] = str(_TEST_BUCKETS)
+    os.environ["OMBRE_BUCKETS_DIR"] = str(_TEST_BUCKETS)
+
+# F-09: embedding.enabled=true 时无 key 会拒绝启动。测试环境注入 dummy key，
+# 避免 `import server`（模块级导入）触发 SystemExit。
+# 真实 API 调用在测试中均被 mock，dummy key 不会发起网络请求。
+if not os.environ.get("OMBRE_EMBED_API_KEY"):
+    os.environ["OMBRE_EMBED_API_KEY"] = "__test_dummy__"
+
+# Ensure src/ is importable
+sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 
 @pytest.fixture
@@ -52,12 +74,12 @@ def test_config(tmp_path):
             "emotion_weights": {"base": 1.0, "arousal_boost": 0.8},
         },
         "dehydration": {
-            "api_key": os.environ.get("OMBRE_API_KEY", "test-key"),
+            "api_key": os.environ.get("OMBRE_COMPRESS_API_KEY", "test-key"),
             "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
             "model": "gemini-2.5-flash-lite",
         },
         "embedding": {
-            "api_key": os.environ.get("OMBRE_API_KEY", ""),
+            "api_key": os.environ.get("OMBRE_EMBED_API_KEY", ""),
             "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
             "model": "gemini-embedding-001",
             "enabled": False,
@@ -166,7 +188,7 @@ def mock_embedding_engine():
     ee.enabled = False
     ee.generate_and_store = AsyncMock(return_value=None)
     ee.search_similar = AsyncMock(return_value=[])
-    ee.delete_embedding = AsyncMock(return_value=True)
+    ee.delete_embedding = MagicMock(return_value=True)   # sync function, not async
     ee.get_embedding = AsyncMock(return_value=None)
     return ee
 

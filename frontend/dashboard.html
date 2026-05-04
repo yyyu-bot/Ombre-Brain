@@ -1,0 +1,3839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ombre Brain</title>
+<meta name="theme-color" content="#B85C3C">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="manifest" href="/static/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<style>
+  :root {
+    /* === 侘寂 wabi-sabi palette === */
+    --bg: #FAF8F3;                    /* 米白 */
+    --bg-gradient: #FAF8F3;
+    --surface: #FAF8F3;
+    --surface-solid: #F5F1E8;
+    --border: #D9D5CB;                /* 淺灰线 */
+    --border-strong: #B8B0A0;
+    --text: #2C2A26;                  /* 墨黑 */
+    --text-dim: #6B665C;
+    --text-light: #9A9489;
+    --accent: #B85C3C;                /* 朱砂 */
+    --accent-light: #C26E50;
+    --accent-glow: rgba(184, 92, 60, 0.08);
+    --positive: #6B8E5C;
+    --negative: #B85C3C;
+    --warning: #B89762;
+    --shadow-light: transparent;
+    --shadow-dark: rgba(44, 42, 38, 0.06);
+    --shadow-dark-subtle: rgba(44, 42, 38, 0.03);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+    font-weight: 400;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.75;
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    padding: 28px 40px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    backdrop-filter: blur(12px);
+    background: rgba(253, 252, 240, 0.7);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+  .header .stats {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 300;
+    letter-spacing: 0.3px;
+  }
+  .search-bar {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .search-bar input {
+    background: var(--surface);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 18px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    width: 260px;
+    transition: all 0.3s ease;
+    box-shadow: inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+  .search-bar input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow), inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+  .search-bar input::placeholder { color: var(--text-light); }
+
+  .tabs {
+    display: flex;
+    padding: 0 40px;
+    gap: 4px;
+    background: rgba(253, 252, 240, 0.5);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    align-items: stretch;
+  }
+  .tab {
+    padding: 12px 18px 10px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.25s ease;
+    letter-spacing: 0.3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.2;
+  }
+  .tab .tab-en {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 10px;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+    font-style: italic;
+  }
+  .tab:hover { color: var(--text); }
+  .tab:hover .tab-en { color: var(--text-dim); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+  }
+  .tab.active .tab-en { color: var(--accent-light); }
+  .tab-spacer { flex: 1; pointer-events: none; }
+  /* Lucide SVG inline-icon defaults */
+  [data-lucide], svg.lucide {
+    width: 14px; height: 14px; vertical-align: -2px;
+    stroke-width: 1.6;
+  }
+  .icon-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .header h1 .ob-logo { display: inline-block; vertical-align: -4px; width: 22px; height: 22px; margin-right: 6px; }
+  .header .version-badge {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px;
+    color: var(--text-light);
+    margin-left: 6px;
+    letter-spacing: 0.5px;
+    font-style: italic;
+  }
+
+  .content { padding: 32px 40px; }
+
+  .filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 8px 18px;
+    font-size: 12px;
+    font-weight: 400;
+    border: none;
+    border-radius: 2px;
+    background: var(--surface-solid);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 4px 8px var(--shadow-dark-subtle), -4px -4px 8px var(--shadow-light);
+  }
+  .filter-btn:hover {
+    color: var(--accent);
+    box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+    transform: translateY(-1px);
+  }
+  .filter-btn:active {
+    transform: translateY(0);
+    box-shadow: inset 2px 2px 5px var(--shadow-dark-subtle), inset -2px -2px 5px var(--shadow-light);
+  }
+  .filter-btn.active {
+    color: var(--bg);
+    background: var(--accent);
+    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.05);
+  }
+
+  .bucket-list { display: flex; flex-direction: column; gap: 8px; }
+  .bucket-row {
+    display: grid;
+    grid-template-columns: 32px 200px 100px 80px 60px 100px 1fr;
+    gap: 12px;
+    padding: 14px 20px;
+    border-radius: 2px;
+    font-size: 13px;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--surface);
+    border: 1px solid transparent;
+    box-shadow: 4px 4px 10px var(--shadow-dark-subtle), -4px -4px 10px var(--shadow-light);
+  }
+  .bucket-row:hover {
+    border-color: var(--border);
+    box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+    transform: translateY(-1px);
+  }
+  .bucket-row .icon { font-size: 16px; text-align: center; }
+  .bucket-row .name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .bucket-row .domain {
+    color: var(--text-dim);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bucket-row .emotion { font-size: 11px; }
+  .bucket-row .score {
+    font-size: 12px;
+    text-align: right;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .bucket-row .time {
+    font-size: 11px;
+    color: var(--text-light);
+    text-align: right;
+  }
+  .bucket-row .preview {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .v-bar {
+    width: 44px;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--negative), var(--warning), var(--positive));
+    position: relative;
+    display: inline-block;
+  }
+  .v-dot {
+    position: absolute;
+    top: -3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface-solid);
+    border: 2px solid var(--accent);
+    transform: translateX(-50%);
+    box-shadow: 0 1px 3px var(--shadow-dark-subtle);
+  }
+
+  .detail-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 440px;
+    height: 100vh;
+    background: var(--surface-solid);
+    border-left: 1px solid var(--border);
+    padding: 32px 28px;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    box-shadow: -8px 0 24px var(--shadow-dark-subtle);
+  }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel .close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .detail-panel .close-btn:hover {
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+  .detail-panel h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--accent);
+    padding-right: 40px;
+  }
+  .detail-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .detail-meta .field { font-size: 12px; }
+  .detail-meta .field label {
+    color: var(--text-light);
+    display: block;
+    margin-bottom: 3px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .detail-content {
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    background: var(--surface);
+    padding: 20px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    max-height: 50vh;
+    overflow-y: auto;
+    box-shadow: inset 3px 3px 6px var(--shadow-dark-subtle), inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .config-section {
+    margin-bottom: 28px;
+    padding: 24px;
+    background: var(--surface);
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    box-shadow: 6px 6px 14px var(--shadow-dark-subtle), -6px -6px 14px var(--shadow-light);
+  }
+  .config-section h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 16px;
+    letter-spacing: 0.3px;
+  }
+  .config-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .config-row label {
+    width: 110px;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+  }
+  .config-row input, .config-row select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    transition: all 0.25s ease;
+    box-shadow: inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+  .config-row input:focus, .config-row select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow), inset 2px 2px 4px var(--shadow-dark-subtle);
+  }
+
+  .btn-primary {
+    padding: 12px 28px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 6px 6px 12px rgba(40, 65, 65, 0.25), -4px -4px 10px var(--shadow-light), inset 0 1px 0 rgba(255,255,255,0.1);
+    letter-spacing: 0.4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.08), transparent);
+    pointer-events: none;
+  }
+  .btn-primary:hover {
+    box-shadow: 8px 8px 16px rgba(40, 65, 65, 0.3), -5px -5px 12px var(--shadow-light), inset 0 1px 0 rgba(255,255,255,0.15);
+    transform: translateY(-2px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.05);
+  }
+  .btn-secondary {
+    padding: 12px 28px;
+    background: var(--surface-solid);
+    color: var(--accent);
+    border: none;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 5px 5px 10px var(--shadow-dark-subtle), -5px -5px 10px var(--shadow-light);
+  }
+  .btn-secondary:hover {
+    box-shadow: 7px 7px 14px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+    transform: translateY(-2px);
+  }
+  .btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: inset 3px 3px 6px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+
+  #network-canvas {
+    width: 100%;
+    height: calc(100vh - 180px);
+    background: var(--bg);
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    box-shadow: inset 4px 4px 10px var(--shadow-dark-subtle), inset -4px -4px 10px var(--shadow-light);
+  }
+  .network-legend {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 1px 3px var(--shadow-dark-subtle);
+  }
+
+  .loading {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 60px;
+    font-size: 14px;
+    font-weight: 300;
+  }
+
+  .breath-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .breath-controls input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    box-shadow: inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+  .breath-controls input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow), inset 2px 2px 4px var(--shadow-dark-subtle);
+  }
+  .breath-controls button {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 12px 26px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 6px 6px 12px rgba(40, 65, 65, 0.25), -4px -4px 10px var(--shadow-light), inset 0 1px 0 rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  .breath-controls button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.08), transparent);
+    pointer-events: none;
+  }
+  .breath-controls button:hover {
+    box-shadow: 8px 8px 16px rgba(40, 65, 65, 0.3), -5px -5px 12px var(--shadow-light);
+    transform: translateY(-2px);
+  }
+  .breath-controls button:active {
+    transform: translateY(0);
+    box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.05);
+  }
+  .breath-controls label {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .breath-info {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    line-height: 1.8;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+  .breath-info code {
+    background: var(--accent-glow);
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: var(--accent);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+  }
+  .score-row {
+    display: grid;
+    grid-template-columns: 32px 180px 1fr 60px;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 2px;
+    font-size: 13px;
+    align-items: center;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+  }
+  .score-row:hover {
+    background: var(--surface);
+    box-shadow: 3px 3px 8px var(--shadow-dark-subtle), -3px -3px 8px var(--shadow-light);
+  }
+  .score-row .rank { color: var(--text-light); font-size: 12px; text-align: center; font-weight: 500; }
+  .score-row .name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .score-bars { display: flex; gap: 4px; align-items: center; }
+  .score-bar-group { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+  .score-bar-track {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+  .score-bar-label {
+    font-size: 9px;
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+  }
+  .score-final { font-size: 14px; font-weight: 600; text-align: right; }
+  .score-pass { color: var(--positive); }
+  .score-fail { color: var(--text-light); }
+
+  .breath-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: 12px;
+    overflow-x: auto;
+    box-shadow: 4px 4px 10px var(--shadow-dark-subtle), -4px -4px 10px var(--shadow-light);
+  }
+  .flow-step {
+    padding: 10px 14px;
+    border-radius: 2px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    text-align: center;
+    min-width: 90px;
+    box-shadow: inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
+  }
+  .flow-step.active { border-color: var(--accent); color: var(--accent); }
+  .flow-arrow { color: var(--text-light); font-size: 16px; }
+
+  @media (max-width: 768px) {
+    .header { padding: 20px; flex-wrap: wrap; }
+    .header h1 { font-size: 22px; }
+    .search-bar { margin-left: 0; width: 100%; }
+    .search-bar input { width: 100%; }
+    .tabs { padding: 0 16px; overflow-x: auto; }
+    .content { padding: 20px 16px; }
+    .bucket-row {
+      grid-template-columns: 28px 1fr 60px;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    .bucket-row .domain,
+    .bucket-row .emotion,
+    .bucket-row .time,
+    .bucket-row .preview { display: none; }
+    .detail-panel { width: 100%; }
+    .config-row { flex-wrap: wrap; }
+    .config-row label { width: 100%; }
+    .breath-flow { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <img class="ob-logo" src="/static/icon.svg" alt="OB" />
+    Ombre Brain<span class="version-badge" id="version-badge"></span>
+  </h1>
+  <span class="stats" id="stats">loading...</span>
+  <span id="heartbeat-indicator" title="MCP 心跳" style="margin-left:10px;font-size:11px;color:var(--text-dim);display:inline-flex;align-items:center;gap:4px;">
+    <span id="heartbeat-dot" style="width:8px;height:8px;border-radius:50%;background:#bbb;display:inline-block;"></span>
+    <span id="heartbeat-text">…</span>
+  </span>
+  <span id="anchor-counter" title="anchor = 坐标系桶，硬上限 24" style="margin-left:10px;font-size:11px;color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="document.querySelector('[data-tab=anchors]')?.click()">
+    <i data-lucide="anchor" style="width:12px;height:12px;"></i>
+    <span id="anchor-counter-text">0/24</span>
+  </span>
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="搜索记忆…" onkeydown="if(event.key==='Enter')doSearch()" />
+    <button onclick="doSearch()" title="搜索" style="background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:0 14px;font-size:12px;cursor:pointer;white-space:nowrap;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">搜索</button>
+  </div>
+  <button onclick="openFeedback()" title="给作者反馈" style="margin-left:8px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 14px;font-size:12px;cursor:pointer;">反馈</button>
+  <button onclick="doLogout()" title="退出登录" style="margin-left:8px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 14px;font-size:12px;cursor:pointer;">退出</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="list"><span>记忆桶</span><span class="tab-en">Buckets</span></div>
+  <div class="tab" data-tab="breath"><span>Breath 模拟</span><span class="tab-en">Breath Trace</span></div>
+  <div class="tab" data-tab="network"><span>记忆网络</span><span class="tab-en">Network</span></div>
+  <div class="tab" data-tab="plan"><span>计划</span><span class="tab-en">Plans</span></div>
+  <div class="tab" data-tab="letters"><span>信</span><span class="tab-en">Letters</span></div>
+  <div class="tab" data-tab="anchors"><span>Anchor</span><span class="tab-en">Anchors</span></div>
+  <div class="tab" data-tab="import"><span>导入</span><span class="tab-en">Import</span></div>
+  <div class="tab" data-tab="logs"><span>日志</span><span class="tab-en">Logs</span></div>
+  <div class="tab" data-tab="settings"><span>设置</span><span class="tab-en">Settings</span></div>
+  <div class="tab-spacer"></div>
+  <div class="tab" data-tab="about"><span>关于</span><span class="tab-en">About</span></div>
+</div>
+
+<div class="content" id="list-view">
+  <div class="filters" id="filters"></div>
+  <div class="bucket-list" id="bucket-list">
+    <div class="loading">加载中…</div>
+  </div>
+  <!-- iter 1.9 C: 已主动遗忘的桶折叠区 / collapsible voluntary-forgotten group -->
+  <details id="forgotten-group" style="margin-top:18px;display:none;">
+    <summary style="cursor:pointer;font-size:13px;color:var(--text-dim);padding:6px 0;">
+      <i data-lucide="moon-off" style="width:14px;height:14px;vertical-align:-2px;"></i>
+      已主动遗忘 <span id="forgotten-count">0</span> 条
+      <button onclick="event.preventDefault(); bucketsForgetAllow();" style="margin-left:12px;font-size:11px;padding:3px 10px;">全部允许浮现</button>
+    </summary>
+    <div id="forgotten-list" style="margin-top:10px;"></div>
+  </details>
+</div>
+
+<!-- purge-toolbar：进入 purge 模式后浮在 list-view 上方 -->
+<div id="purge-toolbar" style="display:none;position:sticky;top:56px;z-index:40;margin:0;padding:10px 40px;background:rgba(253,248,243,0.96);backdrop-filter:blur(8px);border-bottom:1px solid rgba(184,92,60,0.3);align-items:center;gap:10px;flex-wrap:wrap;">
+  <label style="font-size:12px;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:6px;">
+    <input type="checkbox" id="purge-select-all" onchange="purgeToggleAll(this.checked)" style="accent-color:var(--accent);"> 全选
+  </label>
+  <span id="purge-count-label" style="font-size:12px;color:var(--accent);min-width:60px;">已选 0 条</span>
+  <span style="font-size:11px;color:var(--text-dim);flex:1;">点击行选中；仅对当前显示的桶生效</span>
+  <button onclick="openPurgeConfirm()" id="purge-exec-btn" disabled
+    style="background:var(--accent);border:none;color:#fff;border-radius:2px;padding:5px 16px;font-size:12px;cursor:pointer;opacity:0.4;transition:opacity 0.2s;">
+    彻底清除所选
+  </button>
+  <button onclick="exitPurgeMode()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:5px 12px;font-size:12px;cursor:pointer;">退出清理模式</button>
+</div>
+
+
+<div class="content" id="breath-view" style="display:none">
+  <div class="breath-flow" id="breath-flow">
+    <div class="flow-step" id="fs-input">① 输入<br><small>query / valence / arousal</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="fs-candidates">② 候选池<br><small id="fs-cand-n">— 桶</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="fs-scoring">③ 四维评分<br><small>topic×4 + emotion×2 + time×2.5 + imp×1</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="fs-threshold">④ 阈值过滤<br><small id="fs-thresh-n">≥50 → — 通过</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" id="fs-sort">⑤ 降序排列<br><small>返回 top N</small></div>
+  </div>
+
+  <div class="breath-controls">
+    <label>Query</label>
+    <input type="text" id="breath-query" placeholder="关键词…" style="width:220px" />
+    <label>Valence</label>
+    <input type="number" id="breath-valence" placeholder="0~1" min="0" max="1" step="0.1" style="width:80px" />
+    <label>Arousal</label>
+    <input type="number" id="breath-arousal" placeholder="0~1" min="0" max="1" step="0.1" style="width:80px" />
+    <button onclick="runBreathDebug()">模拟 Breath</button>
+  </div>
+
+  <div class="breath-info" id="breath-info" style="display:none"></div>
+  <div id="breath-results">
+    <div class="loading">输入 query 后点击「模拟 Breath」查看评分链路</div>
+  </div>
+</div>
+
+<div class="content" id="network-view" style="display:none">
+  <div class="network-legend">
+    <div class="legend-item"><span class="legend-dot" style="background:#B85C3C"></span> [[双链]]</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#4A7C59"></span> #tag</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#9A7B4F"></span> 既是双链也是 tag</div>
+    <div class="legend-item" style="margin-left:18px;"><span style="display:inline-block;width:18px;height:2px;background:#8A8070;margin-right:6px;vertical-align:middle;"></span> 共现（同一桶里出现）</div>
+    <label style="margin-left:auto;font-size:11px;color:var(--text-dim);display:inline-flex;align-items:center;gap:6px;">
+      模式
+      <select id="network-mode" onchange="loadNetwork()" style="font-size:11px;padding:2px 6px;background:var(--surface);border:1px solid var(--border);color:var(--text);">
+        <option value="concept">概念 / Concept</option>
+        <option value="embedding">桶相似度 / Embedding</option>
+      </select>
+    </label>
+  </div>
+  <canvas id="network-canvas"></canvas>
+</div>
+
+<div class="content" id="import-view" style="display:none">
+  <div style="max-width:720px;margin:0 auto;">
+    <h3>历史对话导入</h3>
+    <p style="color:var(--text-dim);font-size:13px;">支持 Claude JSON、ChatGPT 导出、DeepSeek、Markdown、纯文本格式</p>
+
+    <div id="import-upload-zone" style="border:2px dashed var(--border);border-radius:16px;padding:40px;text-align:center;cursor:pointer;margin:20px 0;transition:border-color .2s;">
+      <div style="font-size:32px;margin-bottom:8px;color:var(--text-dim);"><i data-lucide="folder-up" style="width:32px;height:32px;"></i></div>
+      <div>拖拽文件到此处，或 <span style="color:var(--accent);text-decoration:underline;">点击选择</span></div>
+      <input type="file" id="import-file-input" accept=".json,.txt,.md,.jsonl" style="display:none" />
+    </div>
+
+    <div style="margin:12px 0;">
+      <label><input type="checkbox" id="import-preserve-raw" /> 保留原文模式（特殊情境/暗号/仪式性内容不摘要）</label>
+    </div>
+
+    <div id="import-progress" style="display:none;margin:20px 0;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span id="import-status-text">准备中…</span>
+        <span id="import-progress-text">0/0</span>
+      </div>
+      <div style="background:var(--surface);border-radius:8px;height:12px;overflow:hidden;">
+        <div id="import-progress-bar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%;"></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px;font-size:13px;color:var(--text-dim);">
+        <span>API调用: <b id="import-api-calls">0</b></span>
+        <span>新建: <b id="import-created">0</b></span>
+        <span>合并: <b id="import-merged">0</b></span>
+        <span>原文: <b id="import-raw">0</b></span>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="import-pause-btn" onclick="pauseImport()" style="display:none;">⏸ 暂停</button>
+      </div>
+    </div>
+
+    <div id="import-errors" style="display:none;margin:12px 0;padding:12px;background:var(--surface);border-radius:8px;font-size:12px;color:var(--negative);max-height:120px;overflow-y:auto;"></div>
+
+    <div id="import-results-section" style="margin:20px 0;">
+      <h3>已导入记忆 <button onclick="loadImportResults()" style="font-size:12px;padding:2px 10px;">刷新</button></h3>
+      <div id="import-results-list" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+
+    <hr style="border-color:var(--border);margin:24px 0;" />
+
+    <h3>高频模式检测</h3>
+    <button onclick="detectPatterns()" class="icon-btn"><i data-lucide="activity"></i> 检测高频模式</button>
+    <div id="import-patterns" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<!-- config-view 已并入 settings-view（2026-05-03 任务D 设置/配置合并），保留空容器避免 JS tab 切换报错 -->
+<div class="content" id="config-view" style="display:none"></div>
+
+<div class="detail-panel" id="detail-panel">
+  <button class="close-btn" onclick="closeDetail()">✕</button>
+  <div id="detail-content"></div>
+</div>
+
+<!-- Logs Tab View (iter 1.6 §3) -->
+<div class="content" id="logs-view" style="display:none">
+  <div style="max-width:920px;margin:0 auto;">
+    <div class="config-section">
+      <h3>服务日志</h3>
+      <div class="config-row">
+        <label>级别</label>
+        <select id="logs-level" style="flex:0 0 200px;">
+          <option value="WARNING" selected>WARNING + ERROR</option>
+          <option value="ERROR">仅 ERROR</option>
+          <option value="INFO">INFO + 全量</option>
+          <option value="ALL">所有行</option>
+        </select>
+        <label>行数</label>
+        <input type="number" id="logs-limit" value="200" min="20" max="2000" style="flex:0 0 110px;" />
+        <button class="btn-secondary" onclick="loadLogs()" style="padding:8px 18px;font-size:12px;">刷新</button>
+        <span id="logs-meta" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
+      </div>
+      <pre id="logs-output" style="background:var(--bg);color:var(--text);padding:16px;border-radius:2px;font-size:11px;max-height:60vh;overflow:auto;line-height:1.55;white-space:pre-wrap;word-break:break-all;border:1px solid var(--border);box-shadow:inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);font-family:'SF Mono', Menlo, Consolas, monospace;">点击刷新加载日志…</pre>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-light);">server.log 末尾最多 500 行。</div>
+    </div>
+
+    <!-- 统一错误日志面板（rule.md §11 OB-* 错误码体系）-->
+    <div class="config-section">
+      <h3>错误日志 / Error Codes</h3>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">
+        统一收录所有 W 级以上错误（OB-W*/OB-E*/OB-F*）与自动降级提示（OB-I*）。<br>
+        每条带时间戳 + 一键复制（含错误码 + 描述 + 建议 + 最近 15 条 log）。
+      </div>
+      <div class="config-row" style="gap:8px;align-items:center;">
+        <label>最低级别</label>
+        <select id="errors-min-level" style="flex:0 0 160px;">
+          <option value="I">I + W + E + F</option>
+          <option value="W" selected>W + E + F（默认）</option>
+          <option value="E">E + F</option>
+          <option value="F">仅 F</option>
+        </select>
+        <button class="btn-secondary" onclick="loadOBErrors()" style="padding:6px 14px;font-size:12px;">刷新</button>
+        <button onclick="clearOBErrors()" style="padding:6px 14px;font-size:12px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;">标记已读 / 清空</button>
+        <span id="errors-meta" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
+      </div>
+      <div id="errors-list" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;color:var(--text-dim);padding:24px 0;font-size:12px;">点击「刷新」加载…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Tab View -->
+<!-- ====== iter 1.7 §G: Plan tab — kanban-style list with status + change history ====== -->
+<div class="content" id="plan-view" style="display:none">
+  <div style="max-width:920px;margin:0 auto;">
+    <div class="config-section">
+      <h3>计划 / Plans <span style="font-size:11px;color:var(--text-light);font-style:italic;font-family:'Cormorant Garamond',serif;">— what I promised, what I'm carrying</span></h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+        <button class="btn-secondary" onclick="loadPlans()" style="padding:6px 14px;font-size:12px;"><i data-lucide="refresh-cw"></i> 刷新</button>
+        <span id="plan-stats" style="font-size:12px;color:var(--text-dim);"></span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-light);">勾 ☑ = 完成 / ✕ = 放弃 / ↻ = 重新激活</span>
+      </div>
+      <div id="plan-board" style="display:flex;flex-direction:column;gap:24px;">
+        <div style="text-align:center;color:var(--text-dim);padding:36px 0;font-size:13px;">点击「刷新」加载…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== iter 1.7 §H: About / Author note ====== -->
+<div class="content" id="about-view" style="display:none">
+  <div style="max-width:680px;margin:0 auto;padding:20px 0;">
+    <div id="about-content" style="font-family:'Noto Serif SC',Georgia,serif;line-height:1.95;color:var(--text);">
+      <div style="text-align:center;color:var(--text-dim);padding:36px 0;font-size:13px;">加载中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Letters tab (iter 1.6 follow-up): 把原 letters.html 合并进来 ====== -->
+<div class="content" id="letters-view" style="display:none">
+  <div style="max-width:920px;margin:0 auto;">
+    <div class="config-section">
+      <h3>写一封</h3>
+      <div class="config-row">
+        <label>身份</label>
+        <select id="letter-author" style="flex:0 0 140px;">
+          <option value="user">user</option>
+          <option value="claude">claude</option>
+        </select>
+        <input type="text" id="letter-username" placeholder="user_name（可选）" />
+        <input type="date" id="letter-date" style="flex:0 0 180px;" />
+      </div>
+      <div class="config-row">
+        <label>标题</label>
+        <input type="text" id="letter-title" placeholder="标题（可选）" />
+      </div>
+      <div class="config-row" style="align-items:flex-start;">
+        <label style="padding-top:10px;">正文</label>
+        <textarea id="letter-content" placeholder="…" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:2px;font-family:inherit;font-size:13px;line-height:1.7;min-height:180px;resize:vertical;box-shadow:inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);"></textarea>
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:6px;">
+        <button class="btn-primary" onclick="sendLetter()">寄出</button>
+        <span id="letter-status" style="font-size:12px;color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <h3>信件时间线</h3>
+      <div class="config-row">
+        <label>筛选</label>
+        <select id="letter-filter" onchange="loadLetters()" style="flex:0 0 200px;">
+          <option value="">全部</option>
+          <option value="user">仅 user</option>
+          <option value="claude">仅 claude</option>
+        </select>
+        <button class="btn-secondary" onclick="loadLetters()" style="padding:8px 18px;font-size:12px;">刷新</button>
+        <span id="letter-count" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
+      </div>
+      <div id="letters-list" style="display:flex;flex-direction:column;gap:14px;margin-top:6px;">
+        <div style="text-align:center;color:var(--text-dim);padding:36px 0;font-size:13px;">点击「刷新」加载信件…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- iter 2.0: anchor view / 坐标系桶面板 -->
+<div class="content" id="anchors-view" style="display:none">
+  <div style="max-width:920px;margin:0 auto;">
+    <div class="config-section">
+      <h3><i data-lucide="anchor" style="width:16px;height:16px;vertical-align:-2px;"></i> Anchor — 坐标系</h3>
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.7;margin:4px 0 12px;">
+        anchor 是「定义我们是谁」的事实。它们<b>不会</b>主动出现在默认 breath 里——只在 query / domain / emotion 命中时浮现。<br>
+        硬上限 <b>24</b>。满了之后，要 anchor 新的就必须先 release 一条旧的。痛是结构在工作。
+      </p>
+      <div style="font-size:13px;margin-bottom:10px;">当前：<span id="anchors-count-text">…</span></div>
+      <div id="anchors-list" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="color:var(--text-dim);font-size:12px;">加载中…</div>
+      </div>
+      <button class="btn-secondary" onclick="loadAnchorsView()" style="margin-top:14px;padding:6px 16px;font-size:12px;">刷新</button>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="settings-view" style="display:none">
+  <div style="max-width:680px;margin:0 auto;">
+
+    <!-- 顶部引导 + 6 锚点 -->
+    <div class="config-section" style="background:rgba(0,0,0,0.025);">
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">
+        所有项都直接显示当前生效的值，可以原地改。每一组下方的「保存」按钮会立刻写入 .env / config.yaml / 各设置接口。
+      </div>
+      <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px;">
+        <a href="#sec-me" style="padding:4px 10px;border:1px solid var(--border,#ddd);border-radius:14px;text-decoration:none;color:var(--text);">① 我</a>
+        <a href="#sec-service" style="padding:4px 10px;border:1px solid var(--border,#ddd);border-radius:14px;text-decoration:none;color:var(--text);">② 服务</a>
+        <a href="#sec-engine" style="padding:4px 10px;border:1px solid var(--border,#ddd);border-radius:14px;text-decoration:none;color:var(--text);">③ 引擎</a>
+        <a href="#sec-bucket" style="padding:4px 10px;border:1px solid var(--border,#ddd);border-radius:14px;text-decoration:none;color:var(--text);">④ 桶行为</a>
+        <a href="#sec-env" style="padding:4px 10px;border:1px solid var(--border,#ddd);border-radius:14px;text-decoration:none;color:var(--text);">⑤ 环境变量</a>
+        <a href="#sec-danger" style="padding:4px 10px;border:1px solid rgba(184,92,60,0.5);border-radius:14px;text-decoration:none;color:var(--accent);">⑥ 危险区</a>
+      </div>
+    </div>
+
+    <!-- ① 我 -->
+    <div class="config-section" id="sec-me">
+      <h3>① 我</h3>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">系统通知称呼</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;line-height:1.6;">
+          系统向 Claude 发送通知时用的称呼（如「婷易」「主人」「人类」）。留空 = 默认「人类」。
+        </div>
+        <div class="config-row">
+          <label>称呼</label>
+          <input type="text" id="settings-human-name" placeholder="人类" maxlength="20" style="width:180px;" />
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+          <button class="btn-primary" onclick="saveHumanName()">保存</button>
+          <span id="settings-human-msg" style="font-size:12px;color:var(--text-dim);"></span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">账户密码</div>
+        <div id="settings-env-notice" style="display:none;font-size:12px;color:var(--warning);margin-bottom:8px;">
+          ⚠ 当前使用环境变量 OMBRE_DASHBOARD_PASSWORD，请直接修改环境变量。
+        </div>
+        <div id="settings-pwd-form">
+          <div class="config-row"><label>当前密码</label><input type="password" id="settings-current-pwd" placeholder="当前密码" /></div>
+          <div class="config-row"><label>新密码</label><input type="password" id="settings-new-pwd" placeholder="新密码（至少6位）" /></div>
+          <div class="config-row"><label>确认</label><input type="password" id="settings-new-pwd2" placeholder="再次输入新密码" /></div>
+          <button class="btn-primary" onclick="changePassword()" style="margin-top:4px;">保存</button>
+          <div id="settings-pwd-msg" style="margin-top:10px;font-size:13px;"></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">退出登录</div>
+        <button onclick="doLogout()" style="color:var(--negative);border-color:var(--negative);">退出登录</button>
+      </div>
+    </div>
+
+    <!-- ② 服务 -->
+    <div class="config-section" id="sec-service">
+      <h3>② 服务</h3>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">服务状态</div>
+        <div id="settings-status" style="font-size:13px;color:var(--text-dim);line-height:2;">加载中…</div>
+        <button onclick="loadSettingsStatus()" style="margin-top:8px;font-size:12px;padding:4px 12px;">刷新</button>
+      </div>
+
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">宿主机记忆桶目录 (Docker)</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;line-height:1.6;">
+          docker-compose 中 <code>${OMBRE_HOST_VAULT_DIR:-./buckets}:/data</code> 的宿主机路径。留空 = 项目内 <code>./buckets</code>。
+          <span style="color:var(--warning);">⚠ 修改后需在宿主机执行 <code>docker compose down && docker compose up -d</code> 才会生效。</span>
+        </div>
+        <div class="config-row">
+          <label>路径</label>
+          <input type="text" id="settings-host-vault" placeholder="例如 /Users/you/Obsidian/Ombre Brain" style="flex:1;" />
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+          <button class="btn-primary" onclick="saveHostVault()">保存</button>
+          <button onclick="loadHostVault()" style="font-size:12px;padding:4px 12px;">重新加载</button>
+          <span id="settings-host-vault-msg" style="font-size:12px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 引擎 -->
+    <div class="config-section" id="sec-engine">
+      <h3>③ 引擎</h3>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">脱水 / 打标 LLM</div>
+        <div class="config-row"><label>Model</label><input type="text" id="cfg-dehy-model" placeholder="gemini-2.5-flash-lite" /></div>
+        <div class="config-row"><label>Base URL</label><input type="text" id="cfg-dehy-url" placeholder="https://..." /></div>
+        <div class="config-row"><label>API Key</label><input type="password" id="cfg-dehy-key" placeholder="当前: 加载中…" /></div>
+        <div style="margin-top:-4px;margin-bottom:12px;padding-left:122px;font-size:11px;color:var(--text-light);">留空不改。Key 不会持久化到 yaml（请改用下方「⑤ 环境变量」中的 OMBRE_COMPRESS_API_KEY）</div>
+        <div class="config-row"><label>Max Tokens</label><input type="number" id="cfg-dehy-maxtokens" min="128" max="8192" /></div>
+        <div class="config-row"><label>Temperature</label><input type="number" id="cfg-dehy-temp" min="0" max="2" step="0.05" /></div>
+      </div>
+
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">向量化 Embedding</div>
+        <div id="emb-info-panel" style="margin-bottom:10px;padding:10px 12px;background:var(--bg-soft,#f4f4f4);border-radius:6px;font-size:12px;line-height:1.7;color:var(--text);">
+          <div>当前后端：<b id="emb-info-backend">—</b> · 模型：<span id="emb-info-model">—</span> · 维度：<span id="emb-info-dim">—</span></div>
+          <div>已索引向量：<span id="emb-info-count">—</span> 条 · 启用状态：<span id="emb-info-enabled">—</span></div>
+          <div id="emb-info-meta" style="color:var(--text-light);margin-top:4px;"></div>
+        </div>
+        <div class="config-row">
+          <label>启用</label>
+          <select id="cfg-emb-enabled"><option value="true">开启</option><option value="false">关闭</option></select>
+        </div>
+        <div class="config-row">
+          <label>后端</label>
+          <select id="cfg-emb-backend">
+            <option value="local">本地 bge-m3（默认）</option>
+            <option value="api">Gemini API（云端）</option>
+          </select>
+        </div>
+        <div id="cfg-emb-backend-note" style="margin-top:-4px;padding-left:122px;font-size:11px;color:var(--text-light);line-height:1.6;"></div>
+        <div class="config-row">
+          <label>Model</label>
+          <input type="text" id="cfg-emb-model" placeholder="gemini-embedding-001" />
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;border:1px dashed var(--border,#ddd);border-radius:6px;">
+          <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">
+            切换后端不会自动重算已有向量。若要让旧向量与新后端对齐，请显式触发迁移。
+          </div>
+          <button id="emb-migrate-btn" type="button" style="padding:6px 12px;">切换 / 重算所有 embedding…</button>
+          <div id="emb-migrate-status" style="margin-top:8px;font-size:12px;line-height:1.6;color:var(--text);"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:14px;align-items:center;">
+        <button class="btn-primary" onclick="saveConfig(true)">保存</button>
+        <span id="config-status" style="font-size:13px;"></span>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:var(--text-light);">注：本「保存」按钮同时提交「③ 引擎」与「④ 桶行为」中除采样外的所有字段（同一个 /api/config 接口），并立即写入 config.yaml。</div>
+    </div>
+
+    <!-- ④ 桶行为 -->
+    <div class="config-section" id="sec-bucket">
+      <h3>④ 桶行为</h3>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">呼吸采样 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">/ Breath Sampling</span></div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">
+          关掉 = breath 永远返回得分最高的那条；打开 = 按 score^(1/温度) 加权采样，让中等分数的桶也有机会浮现。温度越高越随机；候选不足时自动回退。
+        </div>
+        <div class="config-row"><label><input type="checkbox" id="sampling-enabled" /> 启用加权采样</label></div>
+        <div class="config-row"><label>top_k（候选池）</label><input type="number" id="sampling-topk" min="1" max="50" step="1" style="width:90px;" /></div>
+        <div class="config-row"><label>sample_k（每次抽几条）</label><input type="number" id="sampling-samplek" min="1" max="20" step="1" style="width:90px;" /></div>
+        <div class="config-row">
+          <label>温度 <span id="sampling-temp-val" style="color:var(--accent);">0.7</span></label>
+          <input type="range" id="sampling-temp" min="0.1" max="2.0" step="0.1" value="0.7"
+                 style="flex:1;" oninput="document.getElementById('sampling-temp-val').textContent=this.value;" />
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+          <button class="btn-primary" onclick="saveSamplingSettings()">保存</button>
+          <button onclick="testSamplingBreath()" style="font-size:12px;padding:4px 12px;">试一次 breath</button>
+          <span id="sampling-msg" style="font-size:12px;"></span>
+        </div>
+        <div id="sampling-test-result" style="margin-top:10px;font-size:12px;color:var(--text-dim);"></div>
+      </div>
+
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">默认参数（与「③ 引擎」共用「保存」按钮）</div>
+        <div class="config-row"><label>合并阈值</label><input type="number" id="cfg-merge" min="0" max="100" /></div>
+        <div style="margin-top:-4px;padding-left:122px;font-size:11px;color:var(--text-light);">0-100，越高越难合并相似桶</div>
+        <div class="config-row"><label>breath 默认桶数</label><input type="number" id="cfg-sf-breath-results" min="1" max="50" /></div>
+        <div style="margin-top:-4px;padding-left:122px;font-size:11px;color:var(--text-light);">1-50。Claude 调用 breath() 不指定 max_results 时使用此默认值</div>
+        <div class="config-row"><label>breath 默认 token</label><input type="number" id="cfg-sf-breath-tokens" min="500" max="20000" step="500" /></div>
+        <div style="margin-top:-4px;padding-left:122px;font-size:11px;color:var(--text-light);">500-20000。breath 单次返回总 token 上限</div>
+        <div class="config-row"><label>feel 历史 token</label><input type="number" id="cfg-sf-feel-tokens" min="500" max="20000" step="500" /></div>
+        <div style="margin-top:-4px;padding-left:122px;font-size:11px;color:var(--text-light);">500-20000。dream / breath(domain=feel) 中新 feel 的全文预算</div>
+      </div>
+    </div>
+
+    <!-- ⑤ 环境变量 -->
+    <div class="config-section" id="sec-env">
+      <h3>⑤ 环境变量</h3>
+      <p style="font-size:12px;color:var(--text-light);margin:0 0 16px;line-height:1.6;">
+        这里改完保存会立即生效并写入 <code>.env</code>（重启后仍有效）。<br>
+        API Key 字段显示脱敏值；输入新值才会覆盖，留空 = 不动。
+      </p>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">压缩 LLM（脱水 / 打标 / 合并）</div>
+        <div class="form-row"><label>API Key</label><input type="password" id="env-compress-key" placeholder="留空 = 不修改" autocomplete="new-password" style="font-family:monospace;" /></div>
+        <div class="form-row"><label>Base URL</label><input type="text" id="env-compress-base" placeholder="例：https://api.deepseek.com/v1" style="font-family:monospace;" /></div>
+        <div class="form-row"><label>Model</label><input type="text" id="env-compress-model" placeholder="例：deepseek-chat" style="font-family:monospace;" /></div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">向量化 Embedding（仅 api 后端用）</div>
+        <div class="form-row"><label>API Key</label><input type="password" id="env-embed-key" placeholder="留空 = 不修改" autocomplete="new-password" style="font-family:monospace;" /></div>
+        <div class="form-row"><label>Base URL</label><input type="text" id="env-embed-base" placeholder="例：https://generativelanguage.googleapis.com/v1beta/openai/" style="font-family:monospace;" /></div>
+        <div class="form-row"><label>Model</label><input type="text" id="env-embed-model" placeholder="例：gemini-embedding-001" style="font-family:monospace;" /></div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Webhook</div>
+        <div class="form-row"><label>Hook URL</label><input type="text" id="env-hook-url" placeholder="留空 = 关闭推送" style="font-family:monospace;" /></div>
+        <div class="form-row">
+          <label>跳过推送</label>
+          <select id="env-hook-skip">
+            <option value="">否（正常推送）</option>
+            <option value="true">是（强制跳过）</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
+        <button class="btn-primary" onclick="saveEnvConfig()">保存</button>
+        <span id="env-config-status" style="font-size:13px;"></span>
+      </div>
+
+      <details style="margin-top:18px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-dim);">其它只读环境变量（点击展开）</summary>
+        <div style="margin-top:10px;padding-left:8px;">
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;line-height:1.6;">
+            以下是当前进程读到的所有 <code>OMBRE_*</code>。敏感字段只显示是否已配置。
+            <span style="color:var(--warning);">修改需重启服务。</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span id="env-vars-summary" style="font-size:12px;color:var(--text-dim);"></span>
+            <button onclick="loadEnvVars()" style="font-size:12px;padding:4px 12px;">刷新</button>
+          </div>
+          <div id="env-vars-list" style="font-size:12px;"></div>
+        </div>
+      </details>
+
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-dim);">系统信息（点击展开）</summary>
+        <div id="config-readonly" style="margin-top:10px;font-size:13px;color:var(--text-dim);line-height:1.8;">加载中…</div>
+      </details>
+    </div>
+
+    <!-- ⑥ 危险区 -->
+    <div class="config-section" id="sec-danger" style="border:1px solid rgba(184,92,60,0.55);background:rgba(184,92,60,0.04);margin-top:40px;">
+      <h3 style="color:var(--accent);">⑥ 危险区</h3>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">数据导出 / 健康</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">
+          导出会打包当前所有 bucket markdown + embeddings.db + 脱敏 config，便于本地备份或迁移。<br>
+          重复桶：每次 hold/grow 后系统会标记相似度 &gt; 0.95 的对，下面可逐对处理。
+        </div>
+        <button class="btn-primary" onclick="downloadExport()">⬇ 导出全部为 zip</button>
+        <button onclick="loadDuplicates()" class="icon-btn" style="margin-left:8px;"><i data-lucide="copy"></i> 检查重复桶</button>
+        <div id="duplicates-list" style="margin-top:14px;font-size:12px;"></div>
+      </div>
+
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--accent);">清理错误导入</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:1.6;">
+          用于批量彻底删除记忆桶（物理删除，不可恢复）。<br>
+          <strong>仅用于清理批量导入时分析出错产生的垃圾记忆。</strong><br>
+          Claude 无法触发此操作；删除后 Claude 下次任意工具调用时会收到一次性通知。
+        </div>
+        <button onclick="enterPurgeMode()"
+          style="background:none;border:1px solid rgba(184,92,60,0.5);color:var(--accent);border-radius:2px;padding:6px 18px;font-size:12px;cursor:pointer;">
+          进入清理模式（批量永久删除）
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Onboarding modal (iter 1.6 §8): 仅当 env+config 都没有任何 key 时弹出 -->
+<div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+  <div style="background:var(--surface-solid);max-width:520px;width:92%;padding:32px 28px;border-radius:18px;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+    <h2 style="font-family:'Cormorant Garamond',serif;color:var(--accent);margin:0 0 12px;">欢迎来到 Ombre Brain</h2>
+    <p style="font-size:13px;color:var(--text-dim);line-height:1.7;margin:0 0 14px;">
+      看起来这是第一次启动。两件事可以现在做，也可以稍后做：
+    </p>
+    <ol style="font-size:13px;line-height:1.8;padding-left:20px;color:var(--text);">
+      <li><b>设置 Dashboard 密码</b>：你下面会看到登录页，第一次填的密码会被记住。</li>
+      <li><b>(可选) 配置 API Key</b>：用于自动脱水压缩和向量化。<br/>
+        <span style="color:var(--text-dim);font-size:12px;">脱水压缩（必需写入）：在 .env 加 <code>OMBRE_COMPRESS_API_KEY=...</code>。向量化（可选）：加 <code>OMBRE_EMBED_API_KEY=...</code>，不配则仅关键词检索。</span>
+      </li>
+    </ol>
+    <p style="font-size:12px;color:var(--text-dim);margin:14px 0 0;">
+      想直接用？点「我先试用一下」。需要看完整指南？打开
+      <a href="https://github.com/" target="_blank" style="color:var(--accent);">README</a>。
+    </p>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="dismissOnboarding()" style="background:var(--accent);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;">我先试用一下</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auth Overlay -->
+<div id="auth-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg-gradient);background-attachment:fixed;display:flex;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:48px 40px;max-width:400px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.12);">
+    <h2 style="font-family:'Cormorant Garamond',serif;font-size:28px;color:var(--accent);margin-bottom:8px;">◐ Ombre Brain</h2>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:28px;" id="auth-subtitle">验证身份</p>
+
+    <!-- Setup form -->
+    <div id="auth-setup-form" style="display:none;">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">首次使用，请设置访问密码</p>
+      <input type="password" id="auth-setup-pwd" placeholder="设置密码（至少6位）" style="display:block;width:100%;padding:10px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-solid);color:var(--text);font-size:14px;margin-bottom:10px;" />
+      <input type="password" id="auth-setup-pwd2" placeholder="确认密码" style="display:block;width:100%;padding:10px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-solid);color:var(--text);font-size:14px;margin-bottom:16px;" onkeydown="if(event.key==='Enter')doSetup()" />
+      <button onclick="doSetup()" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;">设置密码并进入</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="auth-login-form" style="display:none;">
+      <input type="password" id="auth-login-pwd" placeholder="输入访问密码" style="display:block;width:100%;padding:10px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-solid);color:var(--text);font-size:14px;margin-bottom:16px;" onkeydown="if(event.key==='Enter')doLogin()" />
+      <button onclick="doLogin()" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;">登录</button>
+    </div>
+
+    <div id="auth-error" style="color:var(--negative);font-size:13px;margin-top:12px;display:none;"></div>
+  </div>
+</div>
+
+<script>
+// ========================================
+// Auth system / 认证系统
+// ========================================
+async function checkAuth() {
+  try {
+    const resp = await fetch('/auth/status');
+    const data = await resp.json();
+    if (data.setup_needed) {
+      document.getElementById('auth-subtitle').textContent = '首次设置';
+      document.getElementById('auth-setup-form').style.display = 'block';
+    } else if (data.authenticated) {
+      document.getElementById('auth-overlay').style.display = 'none';
+    } else {
+      document.getElementById('auth-subtitle').textContent = '请输入访问密码';
+      document.getElementById('auth-login-form').style.display = 'block';
+    }
+  } catch {
+    document.getElementById('auth-overlay').style.display = 'none';
+  }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function doSetup() {
+  const p1 = document.getElementById('auth-setup-pwd').value;
+  const p2 = document.getElementById('auth-setup-pwd2').value;
+  if (p1.length < 6) return showAuthError('密码至少6位');
+  if (p1 !== p2) return showAuthError('两次密码不一致');
+  const resp = await fetch('/auth/setup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: p1}) });
+  if (resp.ok) {
+    document.getElementById('auth-overlay').style.display = 'none';
+  } else {
+    const d = await resp.json();
+    showAuthError(d.detail || '设置失败');
+  }
+}
+
+async function doLogin() {
+  const pwd = document.getElementById('auth-login-pwd').value;
+  const resp = await fetch('/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pwd}) });
+  if (resp.ok) {
+    document.getElementById('auth-overlay').style.display = 'none';
+  } else {
+    const d = await resp.json();
+    showAuthError(d.detail || '密码错误');
+  }
+}
+
+async function doLogout() {
+  await fetch('/auth/logout', { method: 'POST' });
+  document.getElementById('auth-setup-form').style.display = 'none';
+  document.getElementById('auth-login-form').style.display = 'none';
+  document.getElementById('auth-login-form').style.display = 'block';
+  document.getElementById('auth-subtitle').textContent = '请输入访问密码';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-overlay').style.display = 'flex';
+}
+
+async function changePassword() {
+  const currentPwd = document.getElementById('settings-current-pwd').value;
+  const newPwd = document.getElementById('settings-new-pwd').value;
+  const newPwd2 = document.getElementById('settings-new-pwd2').value;
+  const msgEl = document.getElementById('settings-pwd-msg');
+  if (newPwd.length < 6) { msgEl.style.color = 'var(--negative)'; msgEl.textContent = '新密码至少6位'; return; }
+  if (newPwd !== newPwd2) { msgEl.style.color = 'var(--negative)'; msgEl.textContent = '两次密码不一致'; return; }
+  const resp = await authFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({current: currentPwd, new: newPwd}) });
+  if (!resp) return;
+  if (resp.ok) {
+    msgEl.style.color = 'var(--accent)'; msgEl.textContent = '密码修改成功';
+    document.getElementById('settings-current-pwd').value = '';
+    document.getElementById('settings-new-pwd').value = '';
+    document.getElementById('settings-new-pwd2').value = '';
+  } else {
+    const d = await resp.json();
+    msgEl.style.color = 'var(--negative)'; msgEl.textContent = d.detail || '修改失败';
+  }
+}
+
+async function loadSettingsStatus() {
+  const el = document.getElementById('settings-status');
+  try {
+    const resp = await authFetch('/api/status');
+    if (!resp) return;
+    const d = await resp.json();
+    const noticeEl = document.getElementById('settings-env-notice');
+    if (d.using_env_password) noticeEl.style.display = 'block';
+    else noticeEl.style.display = 'none';
+    el.innerHTML = `
+      <b>版本</b>：${d.version}<br>
+      <b>Bucket 总数</b>：${(d.buckets?.total ?? 0)} （永久:${d.buckets?.permanent ?? 0} / 动态:${d.buckets?.dynamic ?? 0} / 归档:${d.buckets?.archive ?? 0}）<br>
+      <b>衰减引擎</b>：${d.decay_engine}<br>
+      <b>向量搜索</b>：${d.embedding_enabled ? '已启用' : '未启用'}<br>
+    `;
+  } catch(e) {
+    el.textContent = '加载失败: ' + e;
+  }
+  // Also refresh the host-vault input whenever the settings tab is loaded.
+  loadHostVault();
+  // iter 1.9 B: 同步加载 sampling 设置
+  loadSamplingSettings();
+  // #6: 同步加载环境变量面板
+  loadEnvVars();
+}
+
+// #6: 环境变量面板
+async function loadEnvVars() {
+  const listEl = document.getElementById('env-vars-list');
+  const summaryEl = document.getElementById('env-vars-summary');
+  if (!listEl) return;
+  listEl.innerHTML = '<span style="color:var(--text-dim);">加载中…</span>';
+  try {
+    const resp = await authFetch('/api/env-vars');
+    if (!resp) return;
+    const d = await resp.json();
+    const vars = d.vars || [];
+    const setCount = vars.filter(v => v.set).length;
+    summaryEl.textContent = `共 ${vars.length} 个变量，已配置 ${setCount} 个`;
+
+    const groups = [
+      { key: 'llm', label: 'LLM / 压缩' },
+      { key: 'embed', label: 'Embedding / 向量化' },
+      { key: 'paths', label: '路径' },
+      { key: 'system', label: '服务配置' },
+      { key: 'webhook', label: 'Webhook' },
+      { key: 'auth', label: '鉴权' },
+    ];
+
+    let html = '';
+    for (const grp of groups) {
+      const items = vars.filter(v => v.group === grp.key);
+      if (!items.length) continue;
+      html += `<div style="margin-bottom:14px;">
+        <div style="font-weight:600;color:var(--text-dim);letter-spacing:0.05em;font-size:11px;text-transform:uppercase;margin-bottom:6px;">${grp.label}</div>
+        <table style="width:100%;border-collapse:collapse;">`;
+      for (const v of items) {
+        const nameCell = `<code style="font-size:11px;">${v.name}</code>`;
+        let valCell;
+        if (v.sensitive) {
+          valCell = v.set
+            ? `<span style="color:var(--positive);">已配置 ✓</span>`
+            : `<span style="color:var(--text-dim);">未配置 —</span>`;
+        } else {
+          valCell = v.value != null
+            ? `<span style="color:var(--accent);font-family:monospace;">${v.value}</span>`
+            : `<span style="color:var(--text-dim);">（未设置）</span>`;
+        }
+        html += `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:5px 8px 5px 0;width:55%;vertical-align:middle;">${nameCell}<br/><span style="color:var(--text-dim);font-size:11px;">${v.label}</span></td>
+          <td style="padding:5px 0;vertical-align:middle;">${valCell}</td>
+        </tr>`;
+      }
+      html += `</table></div>`;
+    }
+    listEl.innerHTML = html;
+  } catch(e) {
+    listEl.innerHTML = `<span style="color:var(--negative);">加载失败: ${e}</span>`;
+  }
+}
+
+// iter 1.9 B: 加权采样面板 / weighted sampling control panel
+async function loadSamplingSettings() {
+  const msg = document.getElementById('sampling-msg');
+  if (!msg) return;
+  try {
+    const resp = await authFetch('/api/settings/sampling');
+    if (!resp) return;
+    const d = await resp.json();
+    document.getElementById('sampling-enabled').checked = !!d.enabled;
+    document.getElementById('sampling-topk').value = d.top_k;
+    document.getElementById('sampling-samplek').value = d.sample_k;
+    document.getElementById('sampling-temp').value = d.temperature;
+    document.getElementById('sampling-temp-val').textContent = d.temperature;
+  } catch(e) {
+    msg.style.color = 'var(--negative)';
+    msg.textContent = '加载失败: ' + e;
+  }
+}
+
+async function saveSamplingSettings() {
+  const msg = document.getElementById('sampling-msg');
+  msg.style.color = 'var(--text-dim)';
+  msg.textContent = '保存中…';
+  const body = {
+    enabled: document.getElementById('sampling-enabled').checked,
+    top_k: parseInt(document.getElementById('sampling-topk').value, 10),
+    sample_k: parseInt(document.getElementById('sampling-samplek').value, 10),
+    temperature: parseFloat(document.getElementById('sampling-temp').value),
+  };
+  try {
+    const resp = await authFetch('/api/settings/sampling', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!resp) return;
+    const d = await resp.json();
+    if (resp.ok) {
+      msg.style.color = 'var(--accent)';
+      msg.textContent = '已保存（仅热更新到内存）';
+    } else {
+      msg.style.color = 'var(--negative)';
+      msg.textContent = d.error || '保存失败';
+    }
+  } catch(e) {
+    msg.style.color = 'var(--negative)';
+    msg.textContent = '保存失败: ' + e;
+  }
+}
+
+async function testSamplingBreath() {
+  const out = document.getElementById('sampling-test-result');
+  out.textContent = 'breath 中…';
+  try {
+    const resp = await authFetch('/api/breath?n=5');
+    if (!resp) return;
+    const d = await resp.json();
+    const items = (d.buckets || d.results || []).slice(0, 5);
+    if (!items.length) {
+      out.textContent = '没有候选桶（库可能是空的）';
+      return;
+    }
+    out.innerHTML = '本次浮现：<br/>' + items.map((b, i) => {
+      const nm = esc(b.name || b.id || '(无名)');
+      const sc = (b.score != null) ? ' · ' + Number(b.score).toFixed(3) : '';
+      return (i + 1) + '. ' + nm + sc;
+    }).join('<br/>');
+  } catch(e) {
+    out.textContent = '失败: ' + e;
+  }
+}
+
+async function loadHostVault() {
+  const input = document.getElementById('settings-host-vault');
+  const msg = document.getElementById('settings-host-vault-msg');
+  if (!input) return;
+  msg.textContent = '';
+  msg.style.color = 'var(--text-dim)';
+  try {
+    const resp = await authFetch('/api/host-vault');
+    if (!resp) return;
+    const d = await resp.json();
+    input.value = d.value || '';
+    if (d.source === 'env') {
+      msg.textContent = '当前由进程环境变量提供（修改 .env 不会立即覆盖）';
+      msg.style.color = 'var(--warning)';
+    } else if (d.source === 'file') {
+      msg.textContent = '当前来自 ' + (d.env_file || '.env');
+    } else {
+      msg.textContent = '尚未设置（默认使用 ./buckets）';
+    }
+  } catch(e) {
+    msg.style.color = 'var(--negative)';
+    msg.textContent = '加载失败: ' + e;
+  }
+}
+
+async function saveHostVault() {
+  const input = document.getElementById('settings-host-vault');
+  const msg = document.getElementById('settings-host-vault-msg');
+  if (!input) return;
+  const value = input.value.trim();
+  msg.textContent = '保存中…';
+  msg.style.color = 'var(--text-dim)';
+  try {
+    const resp = await authFetch('/api/host-vault', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value})
+    });
+    if (!resp) return;
+    const d = await resp.json();
+    if (resp.ok) {
+      msg.style.color = 'var(--accent)';
+      msg.textContent = '已保存 → ' + (d.env_file || '.env') + '（需重启容器生效）';
+    } else {
+      msg.style.color = 'var(--negative)';
+      msg.textContent = d.error || '保存失败';
+    }
+  } catch(e) {
+    msg.style.color = 'var(--negative)';
+    msg.textContent = '保存失败: ' + e;
+  }
+}
+
+// authFetch: wraps fetch, shows auth overlay on 401
+async function authFetch(url, options) {
+  const resp = await fetch(url, options);
+  if (resp.status === 401) {
+    doLogout();
+    return null;
+  }
+  return resp;
+}
+
+// ========================================
+
+const BASE = location.origin;
+let allBuckets = [];
+let currentFilter = 'all';
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    document.getElementById('list-view').style.display = target === 'list' ? '' : 'none';
+    document.getElementById('breath-view').style.display = target === 'breath' ? '' : 'none';
+    document.getElementById('network-view').style.display = target === 'network' ? '' : 'none';
+    document.getElementById('plan-view').style.display = target === 'plan' ? '' : 'none';
+    document.getElementById('import-view').style.display = target === 'import' ? '' : 'none';
+    document.getElementById('logs-view').style.display = target === 'logs' ? '' : 'none';
+    document.getElementById('settings-view').style.display = target === 'settings' ? '' : 'none';
+    document.getElementById('letters-view').style.display = target === 'letters' ? '' : 'none';
+    document.getElementById('anchors-view').style.display = target === 'anchors' ? '' : 'none';
+    document.getElementById('about-view').style.display = target === 'about' ? '' : 'none';
+    if (target === 'network') loadNetwork();
+    if (target === 'plan') loadPlans();
+    if (target === 'import') { pollImportStatus(); loadImportResults(); }
+    if (target === 'logs') { loadLogs(); loadOBErrors(); }
+    if (target === 'settings') {
+      // 任务D：合并 config + settings 后，切换到「设置」时一次性加载所有面板数据
+      loadSettingsStatus();
+      loadHumanName();
+      loadConfig();
+      refreshEnvConfig();
+      loadSamplingSettings();
+      loadEnvVars();
+      loadHostVault();
+    }
+    if (target === 'letters') loadLetters();
+    if (target === 'anchors') loadAnchorsView();
+    if (target === 'about') loadAbout();
+  });
+});
+
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  searchTimer = setTimeout(() => {
+    if (q) searchBuckets(q);
+    else renderBuckets(allBuckets);
+  }, 300);
+});
+function doSearch() {
+  clearTimeout(searchTimer);
+  const q = document.getElementById('search-input').value.trim();
+  if (q) searchBuckets(q);
+  else renderBuckets(allBuckets);
+}
+
+async function loadBuckets() {
+  try {
+    const res = await fetch(BASE + '/api/buckets');
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data)) {
+      throw new Error((data && data.error) ? data.error : `HTTP ${res.status}`);
+    }
+    allBuckets = data;
+    updateStats();
+    buildFilters();
+    renderBuckets(allBuckets);
+  } catch (e) {
+    document.getElementById('bucket-list').innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+  }
+}
+
+function updateStats() {
+  const total = allBuckets.length;
+  const pinned = allBuckets.filter(b => b.pinned).length;
+  const feels = allBuckets.filter(b => b.type === 'feel').length;
+  const resolved = allBuckets.filter(b => b.resolved).length;
+  const digested = allBuckets.filter(b => b.digested).length;
+  document.getElementById('stats').textContent =
+    total + ' 桶 · ' + pinned + ' 钉选 · ' + feels + ' feel · ' + resolved + ' 已解决 · ' + digested + ' 已消化';
+}
+
+function buildFilters() {
+  const domains = new Set();
+  allBuckets.forEach(b => (b.domain || []).forEach(d => domains.add(d)));
+  const filters = document.getElementById('filters');
+  const types = [
+    { key: 'all', label: '全部' },
+    { key: 'pinned', label: '<i data-lucide="pin"></i> 钉选' },
+    { key: 'feel', label: '<i data-lucide="droplet"></i> Feel' },
+    { key: 'unresolved', label: '<i data-lucide="zap"></i> 未解决' },
+    { key: 'digested', label: '<i data-lucide="leaf"></i> 已消化' },
+    { key: 'archived', label: '<i data-lucide="archive"></i> 归档' },
+  ];
+  filters.innerHTML = types.map(function(t) {
+    return '<button class="filter-btn ' + (t.key === 'all' ? 'active' : '') + '" data-filter="' + t.key + '">' + t.label + '</button>';
+  }).join('') + Array.from(domains).slice(0, 10).map(function(d) {
+    return '<button class="filter-btn" data-filter="domain:' + d + '">' + d + '</button>';
+  }).join('');
+
+  filters.addEventListener('click', function(e) {
+    var btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    filters.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderBuckets(filterBuckets(allBuckets));
+  });
+}
+
+function filterBuckets(buckets) {
+  if (currentFilter === 'all') return buckets;
+  if (currentFilter === 'pinned') return buckets.filter(function(b) { return b.pinned; });
+  if (currentFilter === 'feel') return buckets.filter(function(b) { return b.type === 'feel'; });
+  if (currentFilter === 'unresolved') return buckets.filter(function(b) { return !b.resolved && b.type !== 'permanent' && !b.pinned; });
+  if (currentFilter === 'digested') return buckets.filter(function(b) { return b.digested; });
+  if (currentFilter === 'archived') return buckets.filter(function(b) { return b.type === 'archived' || b.score < 0.3; });
+  if (currentFilter.startsWith('domain:')) {
+    var d = currentFilter.slice(7);
+    return buckets.filter(function(b) { return (b.domain || []).includes(d); });
+  }
+  return buckets;
+}
+
+function renderBuckets(buckets) {
+  var list = document.getElementById('bucket-list');
+  // iter 1.9 C: 把已主动遗忘的桶单独折叠到下方区域，主列表只显示活跃的
+  // Split forgotten ones into the dedicated <details>; the main list stays clean.
+  var forgotten = buckets.filter(function(b) { return b.dont_surface; });
+  var visible = buckets.filter(function(b) { return !b.dont_surface; });
+  renderForgottenGroup(forgotten);
+  if (!visible.length) {
+    list.innerHTML = '<div class="loading">没有记忆桶</div>';
+    return;
+  }
+  list.innerHTML = visible.map(function(b) {
+    // iter 1.8: dont_surface = 主动遗忘（仍在磁盘） / first_of_kind = 首次出现的标签组合
+    var iconName = b.dont_surface ? 'moon-off' : b.pinned ? 'pin' : b.type === 'feel' ? 'droplet' : b.digested ? 'leaf' : b.resolved ? 'moon' : 'message-circle';
+    var icon = '<i data-lucide="' + iconName + '"></i>';
+    var firstBadge = b.first_of_kind ? ' <i data-lucide="sparkles" title="首次出现" style="width:12px;height:12px;color:var(--accent);vertical-align:-1px;"></i>' : '';
+    var vPos = Math.round(b.valence * 100);
+    var modelV = b.model_valence != null ? ' → V' + b.model_valence.toFixed(1) : '';
+    var timeAgo = formatTimeAgo(b.last_active || b.created);
+    var rowStyle = b.dont_surface ? ' style="opacity:0.45;"' : '';
+    // purge mode: prepend checkbox
+    var purgeChk = _purgeMode
+      ? '<input type="checkbox" class="purge-chk" data-id="' + b.id + '" data-name="' + esc(b.name) + '" onchange="purgeUpdateCount()" onclick="event.stopPropagation()" style="accent-color:var(--accent);margin-right:8px;flex-shrink:0;">'
+      : '';
+    var rowClick = _purgeMode ? 'onclick="purgeToggleRow(this)"' : 'onclick="showDetail(\'' + b.id + '\')"';
+    return '<div class="bucket-row"' + rowStyle + ' ' + rowClick + ' style="cursor:pointer;display:flex;align-items:center;">' +
+      purgeChk +
+      '<span class="icon">' + icon + '</span>' +
+      '<span class="name" title="' + esc(b.name) + '">' + esc(b.name) + firstBadge + '</span>' +
+      '<span class="domain">' + (b.domain || []).join(', ') + '</span>' +
+      '<span class="emotion"><span class="v-bar"><span class="v-dot" style="left:' + vPos + '%"></span></span>' + modelV + '</span>' +
+      '<span class="score">' + b.score.toFixed(2) + '</span>' +
+      '<span class="time">' + timeAgo + '</span>' +
+      '<span class="preview">' + esc(b.content_preview) + '</span>' +
+    '</div>';
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function searchBuckets(query) {
+  try {
+    var res = await fetch(BASE + '/api/search?q=' + encodeURIComponent(query));
+    var results = await res.json();
+    renderBuckets(results);
+  } catch (e) {
+    console.error('Search failed:', e);
+  }
+}
+
+async function showDetail(id) {
+  var panel = document.getElementById('detail-panel');
+  var content = document.getElementById('detail-content');
+  content.innerHTML = '<div class="loading">加载中…</div>';
+  panel.classList.add('open');
+
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id);
+    var b = await res.json();
+    var meta = b.metadata || {};
+    // iter 1.8: why_remembered = 这条为什么被记得（展示不计分）
+    var whyHtml = meta.why_remembered ? ('<div style="margin:8px 0 16px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-solid);font-style:italic;color:var(--accent);font-family:\'Cormorant Garamond\',\'Noto Serif SC\',serif;line-height:1.7;">❝ ' + esc(meta.why_remembered) + ' ❞</div>') : '';
+    var firstBadge = meta.first_of_kind ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--accent);margin-left:8px;"><i data-lucide="sparkles" style="width:12px;height:12px;"></i>首次出现</span>' : '';
+    var weightHtml = (meta.type === 'plan' && meta.weight != null) ? ('<div class="field"><label>承诺重量</label><span style="display:inline-block;width:80px;height:6px;background:var(--border);border-radius:3px;vertical-align:middle;overflow:hidden;"><span style="display:block;width:' + Math.round(meta.weight*100) + '%;height:100%;background:var(--accent);"></span></span> ' + (meta.weight*100).toFixed(0) + '% · ' + weightAnchorLabel(meta.weight) + '</div>') : '';
+    // iter 1.9 D3: triggered_by 渲染成可跳转链接
+    var triggerHtml = meta.triggered_by ? ('<div class="field"><label>源 bucket</label><a href="javascript:void(0)" onclick="showDetail(\'' + meta.triggered_by + '\')" style="color:var(--accent);text-decoration:underline;font-size:11px;">' + esc(meta.triggered_by) + ' →</a></div>') : '';
+    // iter 1.9 D2: 反向链——这条触发了哪些 feel
+    var triggeredFeelsHtml = '';
+    if (b.triggered_feels && b.triggered_feels.length) {
+      triggeredFeelsHtml = '<div style="margin:14px 0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface-solid);">' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">这条触发了 ' + b.triggered_feels.length + ' 条 feel：</div>' +
+        '<ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.8;">' +
+        b.triggered_feels.map(function(f) {
+          return '<li><a href="javascript:void(0)" onclick="showDetail(\'' + f.id + '\')" style="color:var(--accent);text-decoration:none;">' + esc(f.name) + '</a></li>';
+        }).join('') +
+        '</ul></div>';
+    }
+    content.innerHTML =
+      '<h2>' + esc(meta.name || id) + firstBadge + '</h2>' +
+      whyHtml +
+      '<div class="detail-meta">' +
+        '<div class="field"><label>ID</label>' + id + '</div>' +
+        '<div class="field"><label>类型</label>' + (meta.type || 'dynamic') + '</div>' +
+        '<div class="field"><label>域</label>' + (meta.domain || []).join(', ') + '</div>' +
+        '<div class="field"><label>标签</label>' + (meta.tags || []).join(', ') + '</div>' +
+        '<div class="field"><label>事件效价</label>V' + (meta.valence || 0.5).toFixed(2) + '</div>' +
+        '<div class="field"><label>唤醒度</label>A' + (meta.arousal || 0.3).toFixed(2) + '</div>' +
+        '<div class="field"><label>模型视角</label>' + (meta.model_valence != null ? 'V' + meta.model_valence.toFixed(2) : '—') + '</div>' +
+        '<div class="field"><label>重要度</label>' + (meta.importance || 5) + '/10</div>' +
+        '<div class="field"><label>权重分</label>' + b.score.toFixed(4) + '</div>' +
+        '<div class="field"><label>激活次数</label>' + (meta.activation_count || 1) + '</div>' +
+        '<div class="field"><label>已解决</label>' + (meta.resolved ? '✓' : '—') + '</div>' +
+        '<div class="field"><label>已消化</label>' + (meta.digested ? '✓' : '—') + '</div>' +
+        '<div class="field"><label>钉选</label>' + (meta.pinned ? '✓' : '—') + '</div>' +
+        '<div class="field"><label>Anchor</label>' + (meta.anchor ? '⚓ 坐标系' : '—') + '</div>' +
+        '<div class="field"><label>创建</label>' + (meta.created || '—') + '</div>' +
+        '<div class="field"><label>最后活跃</label>' + (meta.last_active || '—') + '</div>' +
+        weightHtml +
+        triggerHtml +
+      '</div>' +
+      triggeredFeelsHtml +
+      '<div class="detail-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">' +
+        '<button onclick="bucketPin(\'' + id + '\')" class="icon-btn">' + (meta.pinned ? '<i data-lucide="pin-off"></i> 取消钉选' : '<i data-lucide="pin"></i> 钉选') + '</button>' +
+        '<button onclick="bucketAnchor(\'' + id + '\')" class="icon-btn" title="anchor = 坐标系，不主动浮现，硬上限 24">' + (meta.anchor ? '<i data-lucide="anchor"></i> 释放 anchor' : '<i data-lucide="anchor"></i> 设为 anchor') + '</button>' +
+        '<button onclick="bucketResolve(\'' + id + '\')" class="icon-btn">' + (meta.resolved ? '<i data-lucide="rotate-ccw"></i> 取消已解决' : '<i data-lucide="check"></i> 标记已解决') + '</button>' +
+        '<button onclick="bucketForget(\'' + id + '\')" class="icon-btn">' + (meta.dont_surface ? '<i data-lucide="eye"></i> 重新允许浮现' : '<i data-lucide="moon-off"></i> 主动遗忘') + '</button>' +
+        '<button onclick="bucketArchive(\'' + id + '\')" class="icon-btn"><i data-lucide="archive"></i> 归档</button>' +
+        '<button onclick="bucketDelete(\'' + id + '\')" class="icon-btn" style="color:#b85c3c;"><i data-lucide="trash-2"></i> 彻底删除</button>' +
+      '</div>' +
+      '<div class="detail-content">' + esc(b.content) + '</div>' +
+      renderEditForm(id, Object.assign({}, meta, {_content_for_edit: b.content}));
+  } catch (e) {
+    content.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+  }
+}
+
+async function bucketPin(id) {
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id + '/pin', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    await showDetail(id);
+    loadBuckets();
+  } catch (e) { alert('钉选切换失败: ' + e.message); }
+}
+
+// iter 2.0: anchor 切换 / anchor toggle
+async function bucketAnchor(id) {
+  var body = await toggleAnchor(id);  // toggle = no value
+  if (body && body.ok) {
+    await showDetail(id);
+  }
+}
+
+// iter 1.8: 主动遗忘切换 / voluntary forget toggle
+//   POST /api/bucket/{id}/forget 反转 dont_surface。桁仍在磁盘上，
+//   只不再在无参 breath() 中被主动推出。搜索仍能找到。
+async function bucketForget(id) {
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id + '/forget', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    await showDetail(id);
+    loadBuckets();
+  } catch (e) { alert('遗忘切换失败: ' + e.message); }
+}
+
+// iter 1.9 C: 渲染折叠区 + 批量允许浮现
+function renderForgottenGroup(forgotten) {
+  var box = document.getElementById('forgotten-group');
+  var listEl = document.getElementById('forgotten-list');
+  var countEl = document.getElementById('forgotten-count');
+  if (!box) return;
+  if (!forgotten.length) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  countEl.textContent = forgotten.length;
+  listEl.innerHTML = forgotten.map(function(b) {
+    return '<div class="bucket-row" style="opacity:0.6;">' +
+      '<span class="icon"><i data-lucide="moon-off"></i></span>' +
+      '<span class="name" onclick="showDetail(\'' + b.id + '\')" style="cursor:pointer;">' + esc(b.name) + '</span>' +
+      '<span class="domain">' + (b.domain || []).join(', ') + '</span>' +
+      '<span class="time">' + formatTimeAgo(b.last_active || b.created) + '</span>' +
+      '<button onclick="bucketAllowOne(\'' + b.id + '\')" style="font-size:11px;padding:2px 8px;margin-left:auto;">允许浮现</button>' +
+      '</div>';
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function bucketAllowOne(id) {
+  try {
+    var res = await fetch(BASE + '/api/buckets/forget', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ids: [id], dont_surface: false }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    loadBuckets();
+  } catch (e) { alert('恢复失败: ' + e.message); }
+}
+
+async function bucketsForgetAllow() {
+  var ids = (allBuckets || []).filter(function(b) { return b.dont_surface; }).map(function(b) { return b.id; });
+  if (!ids.length) return;
+  if (!confirm('把这 ' + ids.length + ' 条全部恢复为允许浮现？')) return;
+  try {
+    var res = await fetch(BASE + '/api/buckets/forget', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ids: ids, dont_surface: false }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    loadBuckets();
+  } catch (e) { alert('批量恢复失败: ' + e.message); }
+}
+
+async function bucketResolve(id) {
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id + '/resolve', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    await showDetail(id);
+    loadBuckets();
+  } catch (e) { alert('resolve 切换失败: ' + e.message); }
+}
+
+async function bucketArchive(id) {
+  if (!confirm('确认归档此桶？归档后将从浮现/搜索中隐藏，但文件仍保留在 archive/ 目录。')) return;
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id + '/archive', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    closeDetail();
+    loadBuckets();
+  } catch (e) { alert('归档失败: ' + e.message); }
+}
+
+async function bucketDelete(id) {
+  if (!confirm('⚠️ 这将彻底删除此记忆桶，文件不可恢复。确认删除？')) return;
+  if (!confirm('再次确认：你真的要永久删除吗？')) return;
+  try {
+    var res = await fetch(BASE + '/api/bucket/' + id + '?confirm=true', { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    closeDetail();
+    loadBuckets();
+  } catch (e) { alert('删除失败: ' + e.message); }
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+// ============================================================
+// 记忆网络图改造 patch
+// 替换原来的 loadNetwork() 和 drawConceptNetwork()
+// 新增：深度滑块、点击展开邻居、默认只显示高频节点
+// ============================================================
+
+// –– 全局状态 ––
+var networkData = null;
+var networkState = {
+  focusNode: null,      // 当前聚焦的节点 id，null = 全局视图
+  depth: 2,             // 展开深度
+  visibleNodes: null,   // 当前渲染的节点 id Set
+  positions: {},        // 节点坐标缓存
+  isDragging: false,
+  dragStart: null,
+  panOffset: { x: 0, y: 0 },
+  scale: 1,
+};
+
+// –– 替换 loadNetwork ––
+async function loadNetwork() {
+  var canvas = document.getElementById('network-canvas');
+  var ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  var W = canvas.offsetWidth, H = canvas.offsetHeight;
+
+  ctx.fillStyle = '#FDFCF0';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#8A8070';
+  ctx.font = '14px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('加载记忆网络…', W / 2, H / 2);
+
+  try {
+    var modeSel = document.getElementById('network-mode');
+    var mode = modeSel ? modeSel.value : 'concept';
+    var res = await fetch(BASE + '/api/network?mode=' + encodeURIComponent(mode));
+    networkData = await res.json();
+
+    if (mode === 'embedding') {
+      drawBucketNetwork(ctx, W, H, networkData);
+    } else {
+      initConceptNetwork(canvas, ctx, W, H, networkData);
+    }
+  } catch (e) {
+    ctx.fillStyle = '#8A8070';
+    ctx.textAlign = 'center';
+    ctx.fillText('加载失败: ' + e.message, W / 2, H / 2 + 24);
+  }
+}
+
+// –– 初始化（只跑一次，绑定交互） ––
+function initConceptNetwork(canvas, ctx, W, H, data) {
+  // 注入控制栏（如果还没有）
+  injectNetworkControls();
+
+  // 构建邻接表
+  buildAdjacency(data);
+
+  // 默认视图：只显示 freq 最高的 top 30 节点
+  var nodes = data.nodes || [];
+  var sorted = nodes.slice().sort(function (a, b) { return (b.freq || 1) - (a.freq || 1); });
+  var defaultVisible = new Set(sorted.slice(0, 30).map(function (n) { return n.id; }));
+
+  networkState.focusNode = null;
+  networkState.visibleNodes = defaultVisible;
+  networkState.positions = {};
+  networkState.panOffset = { x: 0, y: 0 };
+  networkState.scale = 1;
+
+  renderConceptNetwork(ctx, W, H, data);
+
+  // 点击节点 → 聚焦展开
+  canvas.addEventListener('click', function (e) {
+    var rect = canvas.getBoundingClientRect();
+    var mx = (e.clientX - rect.left);
+    var my = (e.clientY - rect.top);
+    var hit = hitTest(mx, my, W, H);
+    if (hit) {
+      if (networkState.focusNode === hit) {
+        // 再次点击同一节点 → 回全局视图
+        networkState.focusNode = null;
+        networkState.visibleNodes = new Set(sorted.slice(0, 30).map(function (n) { return n.id; }));
+      } else {
+        networkState.focusNode = hit;
+        networkState.visibleNodes = getNeighbors(hit, networkState.depth, data);
+      }
+      networkState.positions = {};
+      renderConceptNetwork(ctx, W, H, data);
+    }
+  });
+}
+
+// –– 构建邻接表 ––
+function buildAdjacency(data) {
+  data._adj = {};
+  (data.nodes || []).forEach(function (n) { data._adj[n.id] = []; });
+  (data.edges || []).forEach(function (e) {
+    if (data._adj[e.source]) data._adj[e.source].push(e.target);
+    if (data._adj[e.target]) data._adj[e.target].push(e.source);
+  });
+}
+
+// –– BFS 取 depth 层邻居 ––
+function getNeighbors(startId, depth, data) {
+  var visited = new Set([startId]);
+  var frontier = [startId];
+  for (var d = 0; d < depth; d++) {
+    var next = [];
+    frontier.forEach(function (id) {
+      (data._adj[id] || []).forEach(function (nb) {
+        if (!visited.has(nb)) { visited.add(nb); next.push(nb); }
+      });
+    });
+    frontier = next;
+    if (!frontier.length) break;
+  }
+  return visited;
+}
+
+// –– 碰撞检测（返回被点击的节点 id 或 null） ––
+function hitTest(mx, my, W, H) {
+  if (!networkData) return null;
+  var nodes = networkData.nodes || [];
+  var hit = null;
+  nodes.forEach(function (n) {
+    if (!networkState.visibleNodes.has(n.id)) return;
+    var p = networkState.positions[n.id];
+    if (!p) return;
+    var r = Math.max(4, Math.min(16, 3 + Math.sqrt(n.freq || 1) * 3)) + 6;
+    var dx = mx - p.x, dy = my - p.y;
+    if (dx * dx + dy * dy < r * r) hit = n.id;
+  });
+  return hit;
+}
+
+// –– 核心渲染（替换 drawConceptNetwork） ––
+function renderConceptNetwork(ctx, W, H, data) {
+  var allNodes = data.nodes || [];
+  var edges = data.edges || [];
+  var visible = networkState.visibleNodes;
+  var focusId = networkState.focusNode;
+
+  // 过滤出可见的节点
+  var nodes = allNodes.filter(function (n) { return visible.has(n.id); });
+  // 原有的过滤边逻辑对于只显示深度内的节点有瑕疵，最好是 target or source in visible?
+  // 等等，用户给的补丁是:
+  // var edges = allEdges.filter(function (e) { return visible.has(e.source) && visible.has(e.target); });
+  // 用户原始代码的局部作用域 edge 也会使用。所以下面我们使用可见的 edges。
+  // 但是用户给的是 allEdges 然后 edge 里 filter。没关系，按照用户给的：
+  edges = edges.filter(function (e) { return visible.has(e.source) && visible.has(e.target); });
+
+  if (!nodes.length) {
+    ctx.fillStyle = '#FDFCF0'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#8A8070'; ctx.textAlign = 'center';
+    ctx.fillText('还没有 [[双链]] 或 #tag', W / 2, H / 2);
+    return;
+  }
+
+  // 布局：如果没有缓存坐标就重新算
+  var positions = networkState.positions;
+  var needLayout = nodes.some(function (n) { return !positions[n.id]; });
+  if (needLayout) {
+    var cx = W / 2, cy = H / 2;
+
+    if (focusId && positions[focusId]) {
+      // 聚焦模式：焦点居中，邻居围绕
+      positions[focusId] = { x: cx, y: cy };
+    }
+
+    nodes.forEach(function (n, i) {
+      if (positions[n.id]) return;
+      var a = (i / nodes.length) * Math.PI * 2;
+      var r = Math.min(W, H) * 0.32;
+      positions[n.id] = {
+        x: cx + Math.cos(a) * r + (Math.random() - 0.5) * 50,
+        y: cy + Math.sin(a) * r + (Math.random() - 0.5) * 50,
+      };
+    });
+
+    // 力导向（迭代次数按节点数缩减，避免卡顿）
+    var iters = Math.min(120, 30 + nodes.length * 2);
+    for (var iter = 0; iter < iters; iter++) {
+      // 互斥
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          var pa = positions[nodes[i].id], pb = positions[nodes[j].id];
+          var dx = pb.x - pa.x, dy = pb.y - pa.y;
+          var dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+          var force = 1400 / (dist * dist);
+          dx = (dx / dist) * force; dy = (dy / dist) * force;
+          pa.x -= dx; pa.y -= dy; pb.x += dx; pb.y += dy;
+        }
+      }
+      // 边吸引
+      edges.forEach(function (e) {
+        var pa = positions[e.source], pb = positions[e.target];
+        if (!pa || !pb) return;
+        var dx = pb.x - pa.x, dy = pb.y - pa.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var pull = Math.min(1, (e.weight || 1) / 4);
+        var ideal = nodes.length < 20 ? 130 : 100;
+        var force = (dist - ideal) * 0.014 * pull;
+        dx = (dx / Math.max(1, dist)) * force; dy = (dy / Math.max(1, dist)) * force;
+        pa.x += dx; pa.y += dy; pb.x -= dx; pb.y -= dy;
+      });
+      // 向心（焦点节点钉在中心）
+      nodes.forEach(function (n) {
+        if (n.id === focusId) return;
+        var p = positions[n.id];
+        p.x += (cx - p.x) * 0.006;
+        p.y += (cy - p.y) * 0.006;
+      });
+    }
+  }
+
+  // –– 绘制 ––
+  ctx.fillStyle = '#FDFCF0';
+  ctx.fillRect(0, 0, W, H);
+
+  // 提示文字（全局视图显示）
+  if (!focusId) {
+    ctx.fillStyle = '#B0A898';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('显示频率最高的 ' + nodes.length + ' 个节点 · 点击节点展开邻居', W / 2, 22);
+  } else {
+    ctx.fillStyle = '#B85C3C';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('深度 ' + networkState.depth + ' · ' + nodes.length + ' 个节点 · 点击焦点节点返回全局', W / 2, 22);
+  }
+
+  // 边
+  edges.forEach(function (e) {
+    var pa = positions[e.source], pb = positions[e.target];
+    if (!pa || !pb) return;
+    var w = e.weight || 1;
+    var isFocusEdge = (e.source === focusId || e.target === focusId);
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
+    ctx.strokeStyle = isFocusEdge
+      ? 'rgba(184,92,60,0.45)'
+      : 'rgba(138,128,112,' + Math.min(0.5, 0.15 + 0.08 * w) + ')';
+    ctx.lineWidth = isFocusEdge ? Math.min(4, 1 + 0.6 * w) : Math.min(2, 0.5 + 0.4 * w);
+    ctx.stroke();
+  });
+
+  // 节点
+  var colorByKind = { wiki: '#B85C3C', tag: '#4A7C59', mixed: '#9A7B4F' };
+  nodes.forEach(function (n) {
+    var p = positions[n.id];
+    if (!p) return;
+    var r = Math.max(4, Math.min(16, 3 + Math.sqrt(n.freq || 1) * 3));
+    var color = colorByKind[n.kind] || '#B85C3C';
+    var isFocus = (n.id === focusId);
+
+    // 焦点节点：大一圈 + 朱砂外圈
+    if (isFocus) {
+      r = r * 1.4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#B85C3C';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    } else if (n.anchor) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = '#B85C3C';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // 光晕
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r + 4, 0, Math.PI * 2);
+    ctx.fillStyle = color + (isFocus ? '40' : '20');
+    ctx.fill();
+
+    // 节点本体
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = isFocus ? color : color + 'CC';
+    ctx.fill();
+
+    // 标签
+    var label = n.label || n.id;
+    if (label.length > 12) label = label.slice(0, 12) + '…';
+    var prefix = n.kind === 'tag' ? '#' : '';
+    var anchorMark = n.anchor ? '⚓ ' : '';
+    ctx.fillStyle = isFocus ? '#B85C3C' : (n.anchor ? '#B85C3C' : '#3A3530');
+    ctx.font = isFocus ? 'bold 12px Inter, sans-serif' : (n.anchor ? 'bold 11px Inter, sans-serif' : '11px Inter, sans-serif');
+    ctx.textAlign = 'center';
+    ctx.fillText(anchorMark + prefix + label, p.x, p.y + r + 14);
+  });
+}
+
+// –– 注入控制栏 ––
+function injectNetworkControls() {
+  if (document.getElementById('network-depth-control')) return;
+
+  var canvas = document.getElementById('network-canvas');
+  if (!canvas) return;
+  var parent = canvas.parentElement;
+
+  var bar = document.createElement('div');
+  bar.id = 'network-depth-control';
+  bar.style.cssText = [
+    'display:flex', 'align-items:center', 'gap:12px',
+    'padding:8px 16px', 'background:#F5F0E8',
+    'border-bottom:1px solid #D4C5B0',
+    'font-size:13px', 'color:#5A5040'
+  ].join(';');
+
+  bar.innerHTML = [
+    '<span>展开深度</span>',
+    '<input id="depth-slider" type="range" min="1" max="4" value="2" style="width:100px;accent-color:#B5341A;">',
+    '<span id="depth-label" style="color:#B5341A;font-weight:600;min-width:16px">2</span>',
+    '<span style="color:#B0A898;font-size:11px;margin-left:8px">点击节点展开 · 再次点击返回全局</span>'
+  ].join('');
+
+  parent.insertBefore(bar, canvas);
+
+  document.getElementById('depth-slider').addEventListener('input', function () {
+    var v = parseInt(this.value);
+    document.getElementById('depth-label').textContent = v;
+    networkState.depth = v;
+    if (networkState.focusNode && networkData) {
+      networkState.visibleNodes = getNeighbors(networkState.focusNode, v, networkData);
+      networkState.positions = {};
+      var canvas = document.getElementById('network-canvas');
+      var ctx = canvas.getContext('2d');
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      renderConceptNetwork(ctx, W, H, networkData);
+    }
+  });
+}
+
+// drawConceptNetwork 改为调用新函数（兼容原有调用点，如 networkData == 'concept' 情况等）
+function drawConceptNetwork(ctx, W, H, data) {
+  var canvas = document.getElementById('network-canvas');
+  initConceptNetwork(canvas, ctx, W, H, data);
+}
+
+// 旧的桶级网络（embedding 模式仍然能切到）
+function drawBucketNetwork(ctx, W, H, data) {
+  var nodes = data.nodes || [], edges = data.edges || [];
+  if (!nodes.length) {
+    ctx.fillStyle = '#FDFCF0'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#8A8070';
+    ctx.fillText('没有记忆桶', W/2, H/2);
+    return;
+  }
+  var positions = {};
+  var cx = W/2, cy = H/2;
+  nodes.forEach(function(n, i) {
+    var a = (i/nodes.length)*Math.PI*2;
+    var r = Math.min(W,H)*0.35;
+    positions[n.id] = { x: cx+Math.cos(a)*r+(Math.random()-0.5)*50, y: cy+Math.sin(a)*r+(Math.random()-0.5)*50 };
+  });
+  for (var iter=0; iter<60; iter++) {
+    for (var i=0; i<nodes.length; i++) for (var j=i+1; j<nodes.length; j++) {
+      var pa=positions[nodes[i].id], pb=positions[nodes[j].id];
+      var dx=pb.x-pa.x, dy=pb.y-pa.y;
+      var dist=Math.max(1, Math.sqrt(dx*dx+dy*dy));
+      var f=800/(dist*dist);
+      pa.x-=(dx/dist)*f; pa.y-=(dy/dist)*f; pb.x+=(dx/dist)*f; pb.y+=(dy/dist)*f;
+    }
+    edges.forEach(function(e) {
+      var pa=positions[e.source], pb=positions[e.target];
+      if (!pa||!pb) return;
+      var dx=pb.x-pa.x, dy=pb.y-pa.y;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      var w = e.weight || 0.5;
+      var f = (dist-120)*0.01*w;
+      pa.x += (dx/Math.max(1,dist))*f; pa.y += (dy/Math.max(1,dist))*f;
+      pb.x -= (dx/Math.max(1,dist))*f; pb.y -= (dy/Math.max(1,dist))*f;
+    });
+    nodes.forEach(function(n){var p=positions[n.id]; p.x+=(cx-p.x)*0.01; p.y+=(cy-p.y)*0.01;});
+  }
+  ctx.fillStyle='#FDFCF0'; ctx.fillRect(0,0,W,H);
+  edges.forEach(function(e){
+    var pa=positions[e.source], pb=positions[e.target]; if(!pa||!pb) return;
+    var w=e.weight||0.5;
+    ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle='rgba(47,79,79,'+(w*0.35)+')'; ctx.lineWidth=Math.max(0.5,w*2);
+    ctx.stroke();
+  });
+  var colors = { dynamic:'#2F4F4F', permanent:'#9A7B4F', feel:'#8B6A6A', archived:'#B0A590' };
+  nodes.forEach(function(n){
+    var p=positions[n.id];
+    var r=Math.max(4, Math.min(14, (n.score||0)*0.8));
+    var color = colors[n.type] || '#2F4F4F';
+    // anchor 节点：朱砂外圈 (#10)
+    if (n.anchor) {
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+6,0,Math.PI*2);
+      ctx.strokeStyle='#B85C3C'; ctx.lineWidth=2; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(p.x,p.y,r+4,0,Math.PI*2); ctx.fillStyle=color+'15'; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fillStyle=n.resolved?color+'70':color; ctx.fill();
+    if (n.pinned) { ctx.strokeStyle='#9A7B4F'; ctx.lineWidth=2; ctx.stroke(); }
+    var name=(n.anchor?'⚓ ':'')+(n.name||n.id); if (name.length>12) name=name.slice(0,12)+'…';
+    ctx.fillStyle=n.anchor?'#B85C3C':'#3A3530';
+    ctx.font=n.anchor?'bold 11px Inter,sans-serif':'11px Inter,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(name, p.x, p.y+r+14);
+  });
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// iter 1.9 A: plan weight 的中文档位锚点 / semantic anchors for plan weight
+//   <0.30 → 轻；<0.62 → 中；<0.88 → 重；其余 → 必须
+//   边界用插值锚点的中点，避免「拖到 0.50 显示中、0.51 突变成重」
+function weightAnchorLabel(w) {
+  if (w == null) return '';
+  if (w < 0.30) return '轻';
+  if (w < 0.62) return '中';
+  if (w < 0.88) return '重';
+  return '必须';
+}
+window._updateWeightLabel = function(v) {
+  var el = document.getElementById('edit-weight-val');
+  if (el) el.textContent = v + '% · ' + weightAnchorLabel(parseFloat(v) / 100);
+};
+
+function formatTimeAgo(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  var now = new Date();
+  var hours = Math.floor((now - d) / 3600000);
+  if (hours < 1) return '刚刚';
+  if (hours < 24) return hours + 'h前';
+  var days = Math.floor(hours / 24);
+  if (days < 30) return days + 'd前';
+  return Math.floor(days/30) + 'mo前';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDetail();
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
+  }
+});
+
+async function runBreathDebug() {
+  var query = document.getElementById('breath-query').value.trim();
+  var valence = document.getElementById('breath-valence').value;
+  var arousal = document.getElementById('breath-arousal').value;
+  var results = document.getElementById('breath-results');
+  var info = document.getElementById('breath-info');
+
+  results.innerHTML = '<div class="loading">计算中…</div>';
+
+  var url = BASE + '/api/breath-debug?q=' + encodeURIComponent(query);
+  if (valence) url += '&valence=' + valence;
+  if (arousal) url += '&arousal=' + arousal;
+
+  try {
+    var res = await fetch(url);
+    var data = await res.json();
+
+    document.getElementById('fs-input').classList.add('active');
+    document.getElementById('fs-cand-n').textContent = data.total_candidates + ' 桶';
+    document.getElementById('fs-candidates').classList.add('active');
+    document.getElementById('fs-scoring').classList.add('active');
+    document.getElementById('fs-thresh-n').textContent = '≥' + data.threshold + ' → ' + data.passed_count + ' 通过';
+    document.getElementById('fs-threshold').classList.add('active');
+    document.getElementById('fs-sort').classList.add('active');
+
+    var w = data.weights;
+    info.style.display = '';
+    info.innerHTML =
+      '<strong>权重配置</strong>&nbsp;' +
+      'topic=<code>' + w.topic + '</code> emotion=<code>' + w.emotion + '</code> ' +
+      'time=<code>' + w.time + '</code> importance=<code>' + w.importance + '</code>' +
+      ' &nbsp;|&nbsp; 阈值=<code>' + data.threshold + '</code>' +
+      ' &nbsp;|&nbsp; 候选=<code>' + data.total_candidates + '</code> 桶' +
+      ' → 通过=<code>' + data.passed_count + '</code> 桶' +
+      (query ? '' : ' &nbsp;|&nbsp; <em>未输入 query，topic 分数全为 0</em>');
+
+    if (!data.results.length) {
+      results.innerHTML = '<div class="loading">无结果</div>';
+      return;
+    }
+
+    var barColors = {
+      topic: '#2F4F4F',
+      emotion: '#8B6A6A',
+      time: '#9A7B4F',
+      importance: '#4A7C59',
+    };
+
+    results.innerHTML = data.results.map(function(r, i) {
+      var s = r.scores;
+      var passed = r.passed_threshold;
+      var iconName = r.pinned ? 'pin' : r.resolved ? 'moon' : r.type === 'feel' ? 'droplet' : 'message-circle';
+      var icon = '<i data-lucide="' + iconName + '"></i>';
+      var bars = Object.entries(s).map(function(entry) {
+        var key = entry[0], val = entry[1];
+        var pct = Math.round(val * 100);
+        var wt = r.weights[key];
+        return '<div class="score-bar-group">' +
+          '<div class="score-bar-label"><span>' + key + '×' + wt + '</span><span>' + val.toFixed(2) + '</span></div>' +
+          '<div class="score-bar-track">' +
+            '<div class="score-bar-fill" style="width:' + pct + '%;background:' + barColors[key] + '"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      return '<div class="score-row" title="' + esc(r.name) + '">' +
+        '<span class="rank">' + (i < 9 ? '0' : '') + (i + 1) + '</span>' +
+        '<span class="name">' + icon + ' ' + esc(r.name) + '</span>' +
+        '<div class="score-bars">' + bars + '</div>' +
+        '<span class="score-final ' + (passed ? 'score-pass' : 'score-fail') + '">' + r.normalized.toFixed(1) + (r.resolved ? '<small>×0.3</small>' : '') + '</span>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    results.innerHTML = '<div class="loading">请求失败: ' + e.message + '</div>';
+  }
+}
+
+document.getElementById('breath-query').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') runBreathDebug();
+});
+
+// ===== Embedding 后端摘要 + 迁移 =====
+async function refreshEmbInfo() {
+  try {
+    var r = await fetch(BASE + '/api/embedding/info');
+    var d = await r.json();
+    if (!d || !d.ok) return;
+    document.getElementById('emb-info-backend').textContent = d.backend || '—';
+    document.getElementById('emb-info-model').textContent = d.model || '—';
+    document.getElementById('emb-info-dim').textContent = d.vector_dim || '—';
+    document.getElementById('emb-info-count').textContent = (d.db_count != null ? d.db_count : '—');
+    document.getElementById('emb-info-enabled').textContent = d.enabled ? '已启用' : '未启用';
+    var meta = d.db_meta || {};
+    var metaTxt = '';
+    if (meta.model_name || meta.vector_dim) {
+      var dbModel = meta.model_name || '';
+      var dbDim = meta.vector_dim || '';
+      var mismatch = (dbModel && dbModel !== d.model) || (dbDim && String(dbDim) !== String(d.vector_dim));
+      metaTxt = 'embeddings.db 元数据：model=' + dbModel + ' / dim=' + dbDim;
+      if (mismatch) metaTxt += '  ⚠ 与当前后端不一致，建议触发迁移';
+    }
+    document.getElementById('emb-info-meta').textContent = metaTxt;
+  } catch (e) {
+    // ignore
+  }
+}
+
+var _embMigratePollTimer = null;
+function _renderEmbMigrateStatus(s) {
+  var el = document.getElementById('emb-migrate-status');
+  if (!s || !s.phase || s.phase === 'idle') {
+    el.innerHTML = '';
+    return;
+  }
+  var pct = s.total > 0 ? Math.floor((s.done / s.total) * 100) : 0;
+  var html = '阶段：<b>' + s.phase + '</b>'
+    + ' · 进度：' + s.done + ' / ' + s.total + ' (' + pct + '%)'
+    + ' · 失败：' + (s.failed_count || 0);
+  if (s.message) html += '<br>' + s.message;
+  if (s.current_id) html += '<br>当前：<code>' + s.current_id + '</code>';
+  if (s.failed_items && s.failed_items.length) {
+    var sample = s.failed_items.slice(0, 3).map(function(it) { return it.bucket_id + ': ' + it.error; }).join('<br>');
+    html += '<br><span style="color:var(--negative,#c33)">失败样本（前 3）：<br>' + sample + '</span>';
+  }
+  if (s.phase === 'failed' || (s.phase === 'completed' && s.failed_count > 0)) {
+    if (s.tail_log && s.tail_log.length) {
+      html += '<br><details style="margin-top:6px;"><summary>最近 15 行错误日志（点开复制给 AI 排查，不要发给作者）</summary>'
+        + '<pre style="white-space:pre-wrap;font-size:11px;background:#222;color:#eee;padding:8px;border-radius:4px;max-height:240px;overflow:auto;">'
+        + s.tail_log.map(function(ln) { return ln.replace(/</g, '&lt;'); }).join('\n')
+        + '</pre></details>'
+        + '<div style="margin-top:6px;color:var(--text-light);font-size:11px;">这通常是本地环境问题（API key、网络、模型权重）；建议把上面的日志贴给 AI 排查，作者无法看到你机器上的细节。</div>';
+    }
+  }
+  el.innerHTML = html;
+}
+
+async function pollEmbMigrateStatus() {
+  try {
+    var r = await fetch(BASE + '/api/embedding/migrate/status');
+    var d = await r.json();
+    if (!d || !d.ok) return;
+    _renderEmbMigrateStatus(d.status);
+    if (d.status && (d.status.phase === 'completed' || d.status.phase === 'failed') && !d.running) {
+      // 停止轮询，刷新一次摘要
+      if (_embMigratePollTimer) { clearInterval(_embMigratePollTimer); _embMigratePollTimer = null; }
+      refreshEmbInfo();
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+function _startEmbMigratePolling() {
+  if (_embMigratePollTimer) return;
+  pollEmbMigrateStatus();
+  _embMigratePollTimer = setInterval(pollEmbMigrateStatus, 3000);
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'emb-migrate-btn') {
+    var targetBackend = document.getElementById('cfg-emb-backend').value;
+    var msg = '即将用「' + targetBackend + '」后端重算所有 bucket 的向量。\n\n'
+      + '· 会先备份 embeddings.db → embeddings.db.backup\n'
+      + '· 后台跑，每批 10 条间隔 0.5s，期间正常使用\n'
+      + '· 切到 api 需先在「向量化 API Key」环境变量里配好 key\n\n'
+      + '继续？';
+    if (!confirm(msg)) return;
+    var btn = e.target;
+    btn.disabled = true;
+    btn.textContent = '启动中…';
+    fetch(BASE + '/api/embedding/migrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_backend: targetBackend })
+    }).then(function(r) {
+      return r.json().then(function(d) { return { status: r.status, body: d }; });
+    }).then(function(res) {
+      btn.disabled = false;
+      btn.textContent = '切换 / 重算所有 embedding…';
+      if (res.status === 202 && res.body && res.body.ok) {
+        _startEmbMigratePolling();
+      } else {
+        alert('启动失败：' + (res.body && res.body.error || ('HTTP ' + res.status)));
+      }
+    }).catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = '切换 / 重算所有 embedding…';
+      alert('请求失败：' + err.message);
+    });
+  }
+});
+
+async function loadConfig() {
+  try {
+    var res = await fetch(BASE + '/api/config');
+    var cfg = await res.json();
+    document.getElementById('cfg-dehy-model').value = cfg.dehydration.model || '';
+    document.getElementById('cfg-dehy-url').value = cfg.dehydration.base_url || '';
+    document.getElementById('cfg-dehy-key').placeholder = '当前: ' + (cfg.dehydration.api_key_masked || '未设置');
+    document.getElementById('cfg-dehy-key').value = '';
+    document.getElementById('cfg-dehy-maxtokens').value = cfg.dehydration.max_tokens || 1024;
+    document.getElementById('cfg-dehy-temp').value = cfg.dehydration.temperature || 0.1;
+    document.getElementById('cfg-emb-enabled').value = cfg.embedding.enabled ? 'true' : 'false';
+    document.getElementById('cfg-emb-model').value = cfg.embedding.model || '';
+    var backendSel = document.getElementById('cfg-emb-backend');
+    backendSel.value = cfg.embedding.backend || 'local';
+    var noteEl = document.getElementById('cfg-emb-backend-note');
+    var opts = (cfg.embedding.backend_options || []);
+    function renderNote() {
+      var match = opts.find(function(o) { return o.value === backendSel.value; });
+      noteEl.textContent = match ? match.note : '';
+    }
+    renderNote();
+    backendSel.onchange = renderNote;
+    // 加载当前 embedding 后端摘要 + 启动迁移轮询（只刷一次摘要，迁移状态独立轮询）
+    refreshEmbInfo();
+    refreshEnvConfig();
+    document.getElementById('cfg-merge').value = cfg.merge_threshold || 75;
+    var sf = cfg.surfacing || {};
+    document.getElementById('cfg-sf-breath-results').value = sf.breath_max_results || 20;
+    document.getElementById('cfg-sf-breath-tokens').value = sf.breath_max_tokens || 10000;
+    document.getElementById('cfg-sf-feel-tokens').value = sf.feel_max_tokens || 6000;
+    document.getElementById('config-readonly').innerHTML =
+      'Transport: <strong>' + cfg.transport + '</strong><br>Buckets dir: <strong>' + cfg.buckets_dir + '</strong>';
+  } catch (e) {
+    document.getElementById('config-status').innerHTML =
+      '<span style="color:var(--negative)">加载失败: ' + e.message + '</span>';
+  }
+}
+
+async function refreshEnvConfig() {
+  try {
+    var r = await fetch(BASE + '/api/env-config');
+    var d = await r.json();
+    if (!d || !d.ok) return;
+    var f = d.fields || {};
+    // Compress
+    var el;
+    el = document.getElementById('env-compress-key');
+    if (el) { el.placeholder = f['OMBRE_COMPRESS_API_KEY'] && f['OMBRE_COMPRESS_API_KEY'].is_set ? '当前：' + (f['OMBRE_COMPRESS_API_KEY'].value || '***') + '（留空 = 不修改）' : '未设置'; el.value = ''; }
+    el = document.getElementById('env-compress-base');
+    if (el) el.value = (f['OMBRE_COMPRESS_BASE_URL'] || {}).value || '';
+    el = document.getElementById('env-compress-model');
+    if (el) el.value = (f['OMBRE_COMPRESS_MODEL'] || {}).value || '';
+    // Embed
+    el = document.getElementById('env-embed-key');
+    if (el) { el.placeholder = f['OMBRE_EMBED_API_KEY'] && f['OMBRE_EMBED_API_KEY'].is_set ? '当前：' + (f['OMBRE_EMBED_API_KEY'].value || '***') + '（留空 = 不修改）' : '未设置'; el.value = ''; }
+    el = document.getElementById('env-embed-base');
+    if (el) el.value = (f['OMBRE_EMBED_BASE_URL'] || {}).value || '';
+    el = document.getElementById('env-embed-model');
+    if (el) el.value = (f['OMBRE_EMBED_MODEL'] || {}).value || '';
+    // Webhook
+    el = document.getElementById('env-hook-url');
+    if (el) el.value = (f['OMBRE_HOOK_URL'] || {}).value || '';
+    el = document.getElementById('env-hook-skip');
+    if (el) { var skipVal = (f['OMBRE_HOOK_SKIP'] || {}).value || ''; el.value = (skipVal === 'true' || skipVal === '1' || skipVal === 'yes') ? 'true' : ''; }
+  } catch (_) {}
+}
+
+async function saveEnvConfig() {
+  var statusEl = document.getElementById('env-config-status');
+  statusEl.textContent = '保存中…';
+  var updates = {};
+  // Compress
+  var key = document.getElementById('env-compress-key').value.trim();
+  if (key) updates['OMBRE_COMPRESS_API_KEY'] = key;
+  var base = document.getElementById('env-compress-base').value.trim();
+  if (base !== undefined) updates['OMBRE_COMPRESS_BASE_URL'] = base;
+  var model = document.getElementById('env-compress-model').value.trim();
+  if (model !== undefined) updates['OMBRE_COMPRESS_MODEL'] = model;
+  // Embed
+  var ekey = document.getElementById('env-embed-key').value.trim();
+  if (ekey) updates['OMBRE_EMBED_API_KEY'] = ekey;
+  var ebase = document.getElementById('env-embed-base').value.trim();
+  if (ebase !== undefined) updates['OMBRE_EMBED_BASE_URL'] = ebase;
+  var emodel = document.getElementById('env-embed-model').value.trim();
+  if (emodel !== undefined) updates['OMBRE_EMBED_MODEL'] = emodel;
+  // Webhook
+  var hookUrl = document.getElementById('env-hook-url').value.trim();
+  updates['OMBRE_HOOK_URL'] = hookUrl;
+  var hookSkip = document.getElementById('env-hook-skip').value;
+  updates['OMBRE_HOOK_SKIP'] = hookSkip === 'true' ? 'true' : '';
+
+  // 过滤掉所有 undefined（非输入字段的）
+  Object.keys(updates).forEach(function(k) { if (updates[k] === undefined) delete updates[k]; });
+
+  try {
+    var r = await fetch(BASE + '/api/env-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: updates })
+    });
+    var d = await r.json();
+    if (d && d.ok) {
+      statusEl.innerHTML = '<span style="color:var(--positive,#2a9d3f)">✓ 已保存：' + (d.updated || []).join(', ') + (d.warnings && d.warnings.length ? '<br><span style="color:var(--negative)">' + d.warnings.join('; ') + '</span>' : '') + '</span>';
+      refreshEnvConfig();  // 刷新显示新的脱敏值
+    } else {
+      statusEl.innerHTML = '<span style="color:var(--negative)">保存失败：' + (d && d.error ? d.error : '未知错误') + '</span>';
+    }
+  } catch (e) {
+    statusEl.innerHTML = '<span style="color:var(--negative)">请求失败：' + e.message + '</span>';
+  }
+}
+
+async function saveConfig(persist) {
+  var body = {
+    dehydration: {
+      model: document.getElementById('cfg-dehy-model').value,
+      base_url: document.getElementById('cfg-dehy-url').value,
+      max_tokens: parseInt(document.getElementById('cfg-dehy-maxtokens').value) || 1024,
+      temperature: parseFloat(document.getElementById('cfg-dehy-temp').value) || 0.1,
+    },
+    embedding: {
+      enabled: document.getElementById('cfg-emb-enabled').value === 'true',
+      model: document.getElementById('cfg-emb-model').value,
+      backend: document.getElementById('cfg-emb-backend').value,
+    },
+    merge_threshold: parseInt(document.getElementById('cfg-merge').value) || 75,
+    surfacing: {
+      breath_max_results: parseInt(document.getElementById('cfg-sf-breath-results').value) || 20,
+      breath_max_tokens: parseInt(document.getElementById('cfg-sf-breath-tokens').value) || 10000,
+      feel_max_tokens: parseInt(document.getElementById('cfg-sf-feel-tokens').value) || 6000,
+    },
+    persist: persist,
+  };
+  var keyVal = document.getElementById('cfg-dehy-key').value;
+  if (keyVal) body.dehydration.api_key = keyVal;
+
+  var status = document.getElementById('config-status');
+  try {
+    var res = await fetch(BASE + '/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    var result = await res.json();
+    if (result.ok) {
+      status.innerHTML = '<span style="color:var(--positive)">✓ 已更新: ' + result.updated.join(', ') + '</span>';
+      loadConfig();
+    } else {
+      status.innerHTML = '<span style="color:var(--negative)">✗ ' + (result.error || '未知错误') + '</span>';
+    }
+  } catch (e) {
+    status.innerHTML = '<span style="color:var(--negative)">✗ 请求失败: ' + e.message + '</span>';
+  }
+}
+
+checkAuth().then(() => loadBuckets());
+
+// ====== iter 1.7: version badge, plan kanban, about page ======
+async function loadVersionBadge() {
+  try {
+    const r = await fetch(BASE + '/api/version');
+    const d = await r.json();
+    const el = document.getElementById('version-badge');
+    if (el && d.version) el.textContent = 'v' + d.version;
+    document.title = 'Ombre Brain · v' + (d.version || '');
+  } catch(_) {}
+}
+loadVersionBadge();
+
+function _planCard(p) {
+  var name = esc(p.name || (p.content || '').slice(0, 40) || p.id);
+  var content = esc((p.content || '').slice(0, 240));
+  var created = formatTimeAgo(p.created_at);
+  // iter 1.8: 承诺重量条（0–1.0，不计分，仅为 active 列排序与展示）
+  // iter 1.9 A2: 附上中文档位语义错（轻/中/重/必须）
+  var weight = (typeof p.weight === 'number') ? p.weight : null;
+  var weightHtml = (weight != null && p.status === 'active') ?
+    ('<div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim);">' +
+     '<span>重量</span>' +
+     '<span style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><span style="display:block;width:' + Math.round(weight*100) + '%;height:100%;background:linear-gradient(90deg,var(--accent),#d97a55);"></span></span>' +
+     '<span>' + (weight*100).toFixed(0) + '% · ' + weightAnchorLabel(weight) + '</span>' +
+    '</div>') : '';
+  var historyHtml = '';
+  if (p.change_log && p.change_log.length) {
+    historyHtml = '<details style="margin-top:6px;font-size:11px;color:var(--text-dim);"><summary style="cursor:pointer;">变更历史 (' + p.change_log.length + ')</summary><ul style="margin:6px 0 0 18px;line-height:1.7;">' +
+      p.change_log.map(function(h) {
+        var t = (h.ts || '').replace('T',' ');
+        if (h.action === 'status') return '<li>' + esc(t) + ' · status: ' + esc(h.from || '?') + ' → <b>' + esc(h.to || '?') + '</b></li>';
+        if (h.action === 'edit') return '<li>' + esc(t) + ' · 内容编辑</li>';
+        if (h.action === 'created') return '<li>' + esc(t) + ' · 创建（status=' + esc(h.to || 'active') + '）</li>';
+        return '<li>' + esc(t) + ' · ' + esc(h.action) + '</li>';
+      }).join('') + '</ul></details>';
+  }
+  // Action buttons depend on current status
+  var actions = '';
+  if (p.status === 'active') {
+    actions = '<button class="icon-btn" title="标为完成" onclick="planAction(\'' + p.id + '\',\'resolve\')"><i data-lucide="check-square"></i> 完成</button>' +
+              ' <button class="icon-btn" title="放弃" onclick="planAction(\'' + p.id + '\',\'abandon\')"><i data-lucide="x-square"></i> 放弃</button>';
+  } else {
+    actions = '<button class="icon-btn" title="重新激活" onclick="planAction(\'' + p.id + '\',\'reopen\')"><i data-lucide="rotate-ccw"></i> 重新激活</button>';
+  }
+  actions += ' <button class="icon-btn" title="编辑内容" onclick="planEdit(\'' + p.id + '\')"><i data-lucide="pencil"></i> 编辑</button>';
+  return '<div class="plan-card" data-id="' + p.id + '" style="border:1px solid var(--border);border-radius:4px;padding:14px 16px;background:var(--surface-solid);">' +
+    '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:500;color:var(--text);margin-bottom:4px;">' + name + '</div>' +
+        '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;white-space:pre-wrap;">' + content + '</div>' +
+        weightHtml +
+        '<div style="font-size:11px;color:var(--text-light);margin-top:6px;">创建于 ' + created + ' · id <code>' + esc(p.id) + '</code></div>' +
+        historyHtml +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">' + actions + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+async function loadPlans() {
+  const board = document.getElementById('plan-board');
+  const stats = document.getElementById('plan-stats');
+  board.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px 0;font-size:13px;">加载中…</div>';
+  try {
+    const resp = await authFetch('/api/plans');
+    if (!resp) return;
+    const d = await resp.json();
+    if (d.error) { board.innerHTML = '<div style="color:var(--negative)">' + esc(d.error) + '</div>'; return; }
+    stats.textContent = '共 ' + (d.total || 0) + ' 条 · 进行中 ' + d.active.length + ' / 已完成 ' + d.resolved.length + ' / 已放弃 ' + d.abandoned.length;
+    // iter 1.8: active 列按 weight desc 排序（同重量保持后端顺序，即最近更新在前）
+    var activeSorted = (d.active || []).slice().sort(function(a, b) {
+      var wa = (typeof a.weight === 'number') ? a.weight : -1;
+      var wb = (typeof b.weight === 'number') ? b.weight : -1;
+      return wb - wa;
+    });
+    function section(title, items, accent) {
+      if (!items.length) return '';
+      return '<div><h4 style="margin:0 0 8px;color:' + accent + ';font-family:\'Cormorant Garamond\',serif;font-size:16px;font-weight:500;">' + title + ' <span style="font-size:11px;color:var(--text-light);">(' + items.length + ')</span></h4>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;">' + items.map(_planCard).join('') + '</div></div>';
+    }
+    board.innerHTML =
+      section('进行中 / Active', activeSorted, 'var(--accent)') +
+      section('已完成 / Resolved', d.resolved, 'var(--positive)') +
+      section('已放弃 / Abandoned', d.abandoned, 'var(--text-light)');
+    if (window.lucide) lucide.createIcons();
+  } catch(e) {
+    board.innerHTML = '<div style="color:var(--negative)">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function planAction(id, action) {
+  if (action === 'abandon' && !confirm('确认放弃这个计划？仍然会保留在记录里。')) return;
+  try {
+    const resp = await authFetch('/api/plans/' + encodeURIComponent(id) + '/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action}),
+    });
+    if (!resp) return;
+    const d = await resp.json();
+    if (d.error) { alert(d.error); return; }
+    loadPlans();
+  } catch(e) { alert('操作失败: ' + e.message); }
+}
+
+async function planEdit(id) {
+  const card = document.querySelector('.plan-card[data-id="' + id + '"] div[style*="white-space:pre-wrap"]');
+  const cur = card ? card.textContent : '';
+  const next = prompt('编辑计划内容：', cur);
+  if (next === null || next.trim() === '' || next === cur) return;
+  try {
+    const resp = await authFetch('/api/plans/' + encodeURIComponent(id) + '/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'edit', content: next}),
+    });
+    if (!resp) return;
+    const d = await resp.json();
+    if (d.error) { alert(d.error); return; }
+    loadPlans();
+  } catch(e) { alert('编辑失败: ' + e.message); }
+}
+
+async function loadAbout() {
+  const el = document.getElementById('about-content');
+  el.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px 0;font-size:13px;">加载中…</div>';
+  try {
+    const r = await fetch(BASE + '/api/author');
+    const d = await r.json();
+    var html = '<h2 style="font-family:\'Cormorant Garamond\',serif;font-size:30px;color:var(--accent);margin:0 0 8px;font-style:italic;">' + esc(d.title || '') + '</h2>';
+    html += '<div style="height:1px;background:var(--border);margin:14px 0 22px;"></div>';
+    (d.sections || []).forEach(function(s) {
+      html += '<h3 style="font-family:\'Cormorant Garamond\',serif;font-size:20px;color:var(--text);margin:18px 0 8px;font-weight:500;">' + esc(s.heading) + '</h3>';
+      html += '<div style="white-space:pre-wrap;color:var(--text);line-height:1.95;">' + esc(s.body) + '</div>';
+    });
+    if (d.signature) html += '<div style="margin-top:28px;text-align:right;color:var(--text-dim);font-style:italic;font-family:\'Cormorant Garamond\',serif;font-size:16px;">' + esc(d.signature) + '</div>';
+    if (d.ifdian) {
+      html += '<div style="margin-top:28px;padding:18px;background:var(--surface-solid);border:1px solid var(--border);border-radius:4px;text-align:center;">' +
+        '<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">如果它对你有用 / If it helped</div>' +
+        '<a href="' + esc(d.ifdian) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:15px;border-bottom:1px solid var(--accent);padding-bottom:2px;">' +
+        '☕ 在爱发电支持我 / Support on Afdian</a></div>';
+    }
+    el.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--negative)">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+
+// Re-render Lucide icons whenever DOM is ready (covers static markup)
+window.addEventListener('DOMContentLoaded', function() {
+  if (window.lucide) lucide.createIcons();
+  // iter 2.0: refresh anchor counter on first load + every 30s
+  if (typeof refreshAnchorCounter === 'function') {
+    refreshAnchorCounter();
+    setInterval(refreshAnchorCounter, 30000);
+  }
+});
+window.addEventListener('load', function() {
+  if (window.lucide) lucide.createIcons();
+  // iter 1.7 §D: auto-render any dynamically-inserted [data-lucide] icons
+  // 性能保护：debounce 50ms，避免在大量 innerHTML 时疯狂触发
+  if (window.MutationObserver && window.lucide) {
+    var rafToken = null;
+    var obs = new MutationObserver(function(muts) {
+      for (var i = 0; i < muts.length; i++) {
+        if (muts[i].addedNodes && muts[i].addedNodes.length) {
+          if (rafToken) clearTimeout(rafToken);
+          rafToken = setTimeout(function() { lucide.createIcons(); rafToken = null; }, 50);
+          break;
+        }
+      }
+    });
+    obs.observe(document.body, {childList: true, subtree: true});
+  }
+});
+
+// --- Import functions ---
+const uploadZone = document.getElementById('import-upload-zone');
+const fileInput = document.getElementById('import-file-input');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.borderColor = 'var(--accent)'; });
+uploadZone.addEventListener('dragleave', () => { uploadZone.style.borderColor = 'var(--border)'; });
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.style.borderColor = 'var(--border)';
+  if (e.dataTransfer.files.length) startImport(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) startImport(fileInput.files[0]); });
+
+async function startImport(file) {
+  const preserveRaw = document.getElementById('import-preserve-raw').checked;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch(BASE + '/api/import/upload?preserve_raw=' + (preserveRaw ? '1' : '0'), { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) { alert('导入失败: ' + data.error); return; }
+    document.getElementById('import-progress').style.display = '';
+    document.getElementById('import-pause-btn').style.display = '';
+    pollImportStatus();
+  } catch (e) { alert('上传失败: ' + e.message); }
+}
+
+let importPollTimer;
+async function pollImportStatus() {
+  clearInterval(importPollTimer);
+  try {
+    const res = await fetch(BASE + '/api/import/status');
+    const s = await res.json();
+    updateImportUI(s);
+    if (s.status === 'running') {
+      importPollTimer = setInterval(async () => {
+        try {
+          const r2 = await fetch(BASE + '/api/import/status');
+          updateImportUI(await r2.json());
+        } catch(e) {}
+      }, 2000);
+    }
+  } catch(e) {}
+}
+
+function updateImportUI(s) {
+  const prog = document.getElementById('import-progress');
+  if (s.status === 'idle') { prog.style.display = 'none'; return; }
+  prog.style.display = '';
+  const pct = s.total_chunks ? Math.round(s.processed / s.total_chunks * 100) : 0;
+  document.getElementById('import-progress-bar').style.width = pct + '%';
+  document.getElementById('import-progress-text').textContent = s.processed + '/' + s.total_chunks;
+  document.getElementById('import-api-calls').textContent = s.api_calls;
+  document.getElementById('import-created').textContent = s.memories_created;
+  document.getElementById('import-merged').textContent = s.memories_merged;
+  document.getElementById('import-raw').textContent = s.memories_raw;
+  const statusMap = { running: '⏳ 导入中…', paused: '⏸ 已暂停', completed: '✅ 完成', error: '❌ 出错' };
+  document.getElementById('import-status-text').textContent = statusMap[s.status] || s.status;
+  document.getElementById('import-pause-btn').style.display = s.status === 'running' ? '' : 'none';
+  if (s.status !== 'running') clearInterval(importPollTimer);
+  if (s.status === 'completed') loadImportResults();
+  const errDiv = document.getElementById('import-errors');
+  if (s.errors && s.errors.length) {
+    errDiv.style.display = '';
+    errDiv.textContent = s.errors.join('\n');
+  } else { errDiv.style.display = 'none'; }
+}
+
+async function pauseImport() {
+  try { await fetch(BASE + '/api/import/pause', { method: 'POST' }); } catch(e) {}
+}
+
+async function loadImportResults() {
+  const container = document.getElementById('import-results-list');
+  container.innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const res = await fetch(BASE + '/api/import/results?limit=30');
+    const data = await res.json();
+    if (!data.buckets || !data.buckets.length) {
+      container.innerHTML = '<p style="color:var(--text-dim)">暂无记忆桶</p>';
+      return;
+    }
+    container.innerHTML = data.buckets.map(b => `
+      <div id="ir-${b.id}" style="background:var(--surface);border-radius:12px;padding:14px;margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b>${b.name || b.id}</b>
+          <span style="font-size:11px;color:var(--text-dim);">${b.type} | ${(b.domain||[]).join(',')} | imp:${b.importance}</span>
+        </div>
+        <p style="font-size:13px;margin:6px 0;white-space:pre-wrap;">${b.content}</p>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">${(b.tags||[]).map(t=>'#'+t).join(' ')}</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="reviewAction('${b.id}','pin')" class="icon-btn" title="固定为永久记忆"><i data-lucide="pin"></i> 固定</button>
+          <button onclick="reviewAction('${b.id}','important')" class="icon-btn" title="标为重要"><i data-lucide="star"></i> 重要</button>
+          <button onclick="reviewAction('${b.id}','noise')" class="icon-btn" title="标为噪声并resolve"><i data-lucide="trash-2"></i> 噪声</button>
+          <button onclick="if(confirm('确定删除？'))reviewAction('${b.id}','delete')" class="icon-btn" title="彻底删除" style="color:var(--negative);"><i data-lucide="x"></i> 删除</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { container.innerHTML = '<p style="color:var(--negative)">加载失败: ' + e.message + '</p>'; }
+}
+
+async function detectPatterns() {
+  const container = document.getElementById('import-patterns');
+  container.innerHTML = '<div class="loading">检测中…</div>';
+  try {
+    const res = await fetch(BASE + '/api/import/patterns');
+    const data = await res.json();
+    if (!data.patterns || !data.patterns.length) { container.innerHTML = '<p style="color:var(--text-dim)">未检测到高频模式</p>'; return; }
+    container.innerHTML = data.patterns.map(p => `
+      <div style="background:var(--surface);border-radius:12px;padding:14px;margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b>${p.pattern_name}</b>
+          <span style="font-size:12px;color:var(--text-dim);">出现 ${p.count} 次</span>
+        </div>
+        <p style="font-size:13px;margin:6px 0;">${p.pattern_content}</p>
+        <div style="display:flex;gap:8px;">
+          <button onclick="reviewAction('${p.bucket_ids[0]}','pin')" class="icon-btn"><i data-lucide="pin"></i> 固定</button>
+          <button onclick="reviewAction('${p.bucket_ids[0]}','important')" class="icon-btn"><i data-lucide="star"></i> 重要</button>
+          <button onclick="batchReview('${JSON.stringify(p.bucket_ids).replace(/'/g, "\\'").replace(/"/g, '&quot;')}','noise')" class="icon-btn"><i data-lucide="trash-2"></i> 噪声</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { container.innerHTML = '<p style="color:var(--negative)">检测失败: ' + e.message + '</p>'; }
+}
+
+async function reviewAction(bid, action) {
+  try {
+    await fetch(BASE + '/api/import/review', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ decisions: [{ bucket_id: bid, action }] })
+    });
+    // Remove card from UI
+    const card = document.getElementById('ir-' + bid);
+    if (card) card.style.display = 'none';
+  } catch(e) {}
+}
+
+async function batchReview(idsJson, action) {
+  try {
+    const ids = JSON.parse(idsJson);
+    await fetch(BASE + '/api/import/review', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ decisions: ids.map(id => ({ bucket_id: id, action })) })
+    });
+    detectPatterns();
+  } catch(e) {}
+}
+
+// ========================================
+// iter 1.6 §3 — heartbeat indicator + log viewer
+// ========================================
+async function pollHeartbeat() {
+  const dot = document.getElementById('heartbeat-dot');
+  const txt = document.getElementById('heartbeat-text');
+  try {
+    const r = await fetch(BASE + '/api/heartbeat');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    dot.style.background = '#3a9b5c';
+    const idle = Math.floor((Date.now()/1000) - (d.last_op_ts || 0));
+    txt.textContent = '在线 · ' + (d.decay_engine === 'running' ? '衰减运行中' : '衰减停');
+    txt.title = 'uptime ' + d.uptime_s + 's · 上次活跃 ' + idle + 's 前';
+  } catch (e) {
+    dot.style.background = '#c45a3a';
+    txt.textContent = '离线';
+    txt.title = e.message;
+  }
+}
+setInterval(pollHeartbeat, 15000);
+
+async function loadLogs() {
+  const out = document.getElementById('logs-output');
+  const meta = document.getElementById('logs-meta');
+  out.textContent = '加载中…';
+  const level = document.getElementById('logs-level').value;
+  const limit = parseInt(document.getElementById('logs-limit').value, 10) || 200;
+  try {
+    const r = await fetch(BASE + '/api/logs?level=' + encodeURIComponent(level) + '&limit=' + limit);
+    const d = await r.json();
+    if (d.error) { out.textContent = '加载失败: ' + d.error; return; }
+    if (!d.lines || !d.lines.length) {
+      out.textContent = d.note || '(无符合条件的日志)';
+      meta.textContent = d.log_file || '';
+      return;
+    }
+    out.textContent = d.lines.join('\n');
+    meta.textContent = (d.log_file || '') + ' · ' + d.count + ' 行';
+    out.scrollTop = out.scrollHeight;
+  } catch (e) { out.textContent = '加载失败: ' + e.message; }
+}
+
+// ========================================
+// 统一错误体系 — /api/errors/recent + /api/errors/clear
+// ========================================
+function _obLevelStyle(lvl) {
+  if (lvl === 'F') return { bg: 'rgba(184,92,60,0.12)', border: 'rgba(184,92,60,0.5)', label: '🛑 Fatal',   color: 'var(--accent)' };
+  if (lvl === 'E') return { bg: 'rgba(184,92,60,0.08)', border: 'rgba(184,92,60,0.35)', label: '❌ Error',   color: 'var(--accent)' };
+  if (lvl === 'W') return { bg: 'rgba(212,175,55,0.10)', border: 'rgba(212,175,55,0.40)', label: '⚠️ Warn',  color: '#7d6720' };
+  return { bg: 'rgba(120,140,170,0.08)', border: 'rgba(120,140,170,0.30)', label: 'ℹ️ Info', color: 'var(--text-dim)' };
+}
+
+async function loadOBErrors() {
+  const box = document.getElementById('errors-list');
+  const meta = document.getElementById('errors-meta');
+  const minLvl = document.getElementById('errors-min-level').value || 'W';
+  box.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px 0;font-size:12px;">加载中…</div>';
+  try {
+    const r = await fetch(BASE + '/api/errors/recent?min_level=' + encodeURIComponent(minLvl) + '&limit=100');
+    const d = await r.json();
+    if (d.error) { box.innerHTML = '<div style="color:var(--negative);">' + esc(d.error) + '</div>'; return; }
+    const items = d.errors || [];
+    if (!items.length) {
+      box.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px 0;font-size:12px;">暂无 ' + minLvl + ' 级以上的错误记录。</div>';
+      meta.textContent = '0 条';
+      return;
+    }
+    meta.textContent = items.length + ' 条';
+    box.innerHTML = items.map(function(it, i) {
+      var st = _obLevelStyle(it.level || 'W');
+      var copyId = 'ob-err-copy-' + i;
+      var formatted = (it.formatted || '').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      return (
+        '<div style="border:1px solid ' + st.border + ';background:' + st.bg + ';border-radius:3px;padding:10px 12px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;">' +
+          '<span style="color:' + st.color + ';font-weight:600;">' + st.label + '</span>' +
+          '<span style="font-family:Menlo,monospace;color:var(--text);">' + esc(it.code || '?') + '</span>' +
+          '<span style="color:var(--text);">' + esc(it.title || '') + '</span>' +
+          '<span style="margin-left:auto;color:var(--text-dim);font-size:11px;">' + esc(it.ts || '') + '</span>' +
+          '<button onclick="copyOBError(' + i + ')" id="' + copyId + '" ' +
+            'style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:3px 10px;font-size:11px;cursor:pointer;">复制</button>' +
+        '</div>' +
+        (it.detail ? '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.6;">' + esc(it.detail) + '</div>' : '') +
+        '<details style="margin-top:6px;"><summary style="font-size:11px;color:var(--text-dim);cursor:pointer;">展开完整报告（含建议+最近 15 条 log）</summary>' +
+        '<pre style="margin:8px 0 0;background:var(--bg);padding:10px;border-radius:2px;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-all;font-family:Menlo,monospace;color:var(--text);">' + esc(it.formatted || '') + '</pre>' +
+        '</details>' +
+        '</div>'
+      );
+    }).join('');
+    // 把 formatted 暂存到 window 供 copyOBError 使用
+    window._obErrorFormatted = items.map(function(it) { return it.formatted || ''; });
+  } catch (e) {
+    box.innerHTML = '<div style="color:var(--negative);">加载失败：' + esc(e.message) + '</div>';
+  }
+}
+
+function copyOBError(i) {
+  var arr = window._obErrorFormatted || [];
+  var text = arr[i] || '';
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = document.getElementById('ob-err-copy-' + i);
+    if (btn) {
+      var orig = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(function() { btn.textContent = orig; }, 1200);
+    }
+  }).catch(function(e) { alert('复制失败：' + e.message); });
+}
+
+async function clearOBErrors() {
+  if (!confirm('清空错误日志？此操作不影响 server.log，仅清空 errors.jsonl。')) return;
+  try {
+    var r = await fetch(BASE + '/api/errors/clear', { method: 'POST' });
+    var d = await r.json();
+    if (d.error) { alert('清空失败：' + d.error); return; }
+    await loadOBErrors();
+  } catch (e) { alert('清空失败：' + e.message); }
+}
+
+// ========================================
+// iter 1.6 §2 — export zip + §4 duplicates panel
+// ========================================
+function downloadExport() {
+  // 直接走浏览器下载
+  window.location.href = BASE + '/api/export';
+}
+
+async function loadDuplicates() {
+  const box = document.getElementById('duplicates-list');
+  box.innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const r = await fetch(BASE + '/api/duplicates');
+    const d = await r.json();
+    const pairs = d.pairs || [];
+    if (!pairs.length) { box.innerHTML = '<p style="color:var(--text-dim)">没有发现疑似重复桶。</p>'; return; }
+    box.innerHTML = pairs.map(p => `
+      <div style="background:var(--surface);border-radius:10px;padding:10px;margin:6px 0;">
+        <div style="font-size:12px;color:var(--text-dim);">相似度 ${p.score ? p.score.toFixed(3) : '—'}</div>
+        <div style="margin:4px 0;"><a href="#" onclick="showDetail('${p.a.id}');return false;">${esc(p.a.name || p.a.id)}</a> ⟷ <a href="#" onclick="showDetail('${p.b.id}');return false;">${esc(p.b.name || p.b.id)}</a></div>
+      </div>
+    `).join('');
+  } catch (e) { box.innerHTML = '<p style="color:var(--negative)">加载失败: ' + e.message + '</p>'; }
+}
+
+// ========================================
+// iter 1.6 §6 — trace 编辑表单（注入到 detail 面板）
+// 在 showDetail 渲染完后调用，给「编辑」按钮挂事件
+// ========================================
+function renderEditForm(bid, meta) {
+  const curContent = (meta._content_for_edit || '').replace(/</g, '&lt;');
+  return `
+    <details style="margin-top:14px;border:1px solid var(--border);border-radius:2px;padding:12px 14px;background:var(--surface-solid);">
+      <summary style="cursor:pointer;font-weight:600;color:var(--accent);">✎ 编辑这条记忆</summary>
+      <div style="display:grid;grid-template-columns:90px 1fr;gap:10px 12px;align-items:center;margin-top:14px;font-size:13px;">
+        <label>名称</label>
+        <input id="edit-name" type="text" value="${esc(meta.name || '')}" />
+        <label>类型</label>
+        <select id="edit-type" style="width:160px;">
+          ${['dynamic','permanent','feel','plan','letter'].map(t =>
+            `<option value="${t}" ${meta.type === t ? 'selected' : ''}>${t}</option>`
+          ).join('')}
+        </select>
+        <label>主题（domain）</label>
+        <input id="edit-domain" type="text" value="${esc((meta.domain||[]).join(', '))}" placeholder="逗号分隔，如：工作, 心情" />
+        <label>标签</label>
+        <input id="edit-tags" type="text" value="${esc((meta.tags||[]).join(', '))}" placeholder="逗号分隔" />
+        <label>重要度</label>
+        <span><input id="edit-importance" type="range" min="1" max="10" value="${meta.importance || 5}" oninput="document.getElementById('edit-imp-val').textContent=this.value" style="vertical-align:middle;" /> <span id="edit-imp-val">${meta.importance || 5}</span>/10</span>
+        <label>已解决</label>
+        <span><input id="edit-resolved" type="checkbox" ${meta.resolved ? 'checked' : ''} /> <small style="color:var(--text-dim);">勾上后仅在关键词命中时重现（适合已闭环的 plan / 事件）</small></span>
+        <label>钉选</label>
+        <span><input id="edit-pinned" type="checkbox" ${meta.pinned ? 'checked' : ''} /> <small style="color:var(--text-dim);">会自动锁 importance=10</small></span>
+        <label>已消化</label>
+        <span><input id="edit-digested" type="checkbox" ${meta.digested ? 'checked' : ''} /></span>
+        <label>主动遗忘</label>
+        <span><input id="edit-dont-surface" type="checkbox" ${meta.dont_surface ? 'checked' : ''} /> <small style="color:var(--text-dim);">不在 breath 中主动浮现（桁仍保留）</small></span>
+        <label style="align-self:start;padding-top:8px;">为什么记得</label>
+        <textarea id="edit-why" placeholder="可选：这条为什么值得保留（仅展示，不计分）" style="min-height:50px;font-family:inherit;line-height:1.7;resize:vertical;">${esc(meta.why_remembered || '')}</textarea>
+        ${meta.type === 'plan' ? `<label>承诺重量</label>
+        <span>
+          <input id="edit-weight" type="range" min="0" max="100" value="${Math.round((meta.weight||0)*100)}" oninput="window._updateWeightLabel && window._updateWeightLabel(this.value)" list="weight-anchors" style="vertical-align:middle;width:200px;" />
+          <datalist id="weight-anchors"><option value="25"></option><option value="50"></option><option value="75"></option><option value="100"></option></datalist>
+          <span id="edit-weight-val" style="margin-left:8px;">${Math.round((meta.weight||0)*100)}% · ${weightAnchorLabel((meta.weight||0))}</span>
+          <small style="color:var(--text-dim);display:block;margin-top:4px;">轻 25% · 中 50% · 重 75% · 必须 100%（0–100%，仅用于排序展示）</small>
+        </span>` : ''}
+        <label style="align-self:start;padding-top:8px;">正文</label>
+        <textarea id="edit-content" placeholder="留空不改" style="min-height:120px;font-family:inherit;line-height:1.7;resize:vertical;">${curContent}</textarea>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
+        <button class="btn-primary" onclick="bucketSaveEdit('${bid}')">保存修改</button>
+        <span id="edit-msg" style="font-size:12px;"></span>
+      </div>
+    </details>`;
+}
+
+async function bucketSaveEdit(bid) {
+  const newContent = document.getElementById('edit-content').value;
+  // iter 1.8: 新增 why_remembered / dont_surface / weight，plan 才会有 weight
+  const weightEl = document.getElementById('edit-weight');
+  const body = {
+    name: document.getElementById('edit-name').value,
+    type: document.getElementById('edit-type').value,
+    tags: document.getElementById('edit-tags').value,
+    domain: document.getElementById('edit-domain').value,
+    importance: parseInt(document.getElementById('edit-importance').value, 10),
+    resolved: document.getElementById('edit-resolved').checked,
+    pinned: document.getElementById('edit-pinned').checked,
+    digested: document.getElementById('edit-digested').checked,
+    dont_surface: document.getElementById('edit-dont-surface').checked,
+    why_remembered: document.getElementById('edit-why').value,
+  };
+  if (weightEl) body.weight = parseFloat(weightEl.value) / 100;
+  // 内容只在非空时带上，避免误清空
+  if (newContent && newContent.trim()) body.content = newContent;
+  const msg = document.getElementById('edit-msg');
+  msg.textContent = '保存中…';
+  msg.style.color = 'var(--text-dim)';
+  try {
+    const r = await fetch(BASE + '/api/bucket/' + bid + '/edit', {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    msg.textContent = '✓ 已保存：' + (d.updated || []).join(', ');
+    msg.style.color = 'var(--accent)';
+    await showDetail(bid);
+    loadBuckets();
+  } catch (e) {
+    msg.textContent = '✕ ' + e.message;
+    msg.style.color = 'var(--negative)';
+  }
+}
+
+// ========================================
+// iter 1.6 §8 — onboarding 首启引导
+// ========================================
+async function maybeShowOnboarding() {
+  try {
+    const r = await fetch(BASE + '/api/onboarding/status');
+    const d = await r.json();
+    if (d.first_run) {
+      document.getElementById('onboarding-overlay').style.display = 'flex';
+    }
+  } catch (e) { /* 静默 */ }
+}
+function dismissOnboarding() {
+  document.getElementById('onboarding-overlay').style.display = 'none';
+}
+
+// ========================================
+// Letters tab — 合并自原 letters.html
+// ========================================
+let _lettersCache = [];
+
+// ========================================
+// iter 2.0: Anchor counter + view
+// ========================================
+async function refreshAnchorCounter() {
+  try {
+    const resp = await authFetch('/api/anchors');
+    if (!resp || !resp.ok) return;
+    const d = await resp.json();
+    const el = document.getElementById('anchor-counter-text');
+    if (el) el.textContent = `${d.count}/${d.limit}`;
+    return d;
+  } catch(e) { /* ignore */ }
+}
+function _escapeAnchorHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function loadAnchorsView() {
+  const list = document.getElementById('anchors-list');
+  const cnt = document.getElementById('anchors-count-text');
+  list.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">加载中…</div>';
+  try {
+    const resp = await authFetch('/api/anchors');
+    if (!resp || !resp.ok) { list.innerHTML = '<div style="color:#c33;">加载失败</div>'; return; }
+    const d = await resp.json();
+    cnt.innerHTML = `<b>${d.count}</b> / ${d.limit} 槽已用`;
+    if (d.count === 0) {
+      list.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:14px 0;">还没有 anchor。在桶详情页用 ⚓ 按钮把一条「定义我们是谁」的事实钉为坐标系。</div>';
+      refreshAnchorCounter();
+      return;
+    }
+    list.innerHTML = d.anchors.map((a, i) => `
+      <div style="border:1px solid var(--border);padding:10px 14px;border-radius:2px;display:flex;align-items:center;gap:12px;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--accent);min-width:32px;">${String(i+1).padStart(2,'0')}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:500;font-size:13px;">
+            <a href="javascript:void(0)" onclick="showDetail('${a.id}')" style="color:var(--text);text-decoration:none;">${_escapeAnchorHtml(a.name || a.id)}</a>
+            ${a.pinned ? '<span style="font-size:10px;color:var(--accent);margin-left:6px;">📌 pinned</span>' : ''}
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.5;">${_escapeAnchorHtml(a.preview || '')}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">created: ${a.created || ''}</div>
+        </div>
+        <button class="btn-secondary" style="font-size:11px;padding:4px 12px;" onclick="releaseAnchor('${a.id}')">release</button>
+      </div>
+    `).join('');
+    refreshAnchorCounter();
+  } catch(e) {
+    list.innerHTML = `<div style="color:#c33;">加载失败：${e}</div>`;
+  }
+}
+async function toggleAnchor(bucketId, value) {
+  try {
+    const resp = await authFetch(`/api/bucket/${bucketId}/anchor`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(value === undefined ? {} : {value: value}),
+    });
+    if (!resp) return null;
+    const body = await resp.json();
+    if (resp.status === 409) {
+      alert(`anchor 已满 ${body.limit}/${body.limit}。\n\n如果这条新的比某条旧的更核心，先去 Anchor 面板 release 那条旧的。\n\n（痛是结构在工作。anchor 是稀缺的。）`);
+      return body;
+    }
+    if (!resp.ok) {
+      alert(`anchor 操作失败：${body.error || resp.status}`);
+      return body;
+    }
+    refreshAnchorCounter();
+    return body;
+  } catch(e) {
+    alert(`anchor 操作失败：${e}`);
+    return null;
+  }
+}
+async function releaseAnchor(bucketId) {
+  if (!confirm('从 anchor 释放这条？\n它会变回普通桶，重新参与默认浮现。pinned 状态保留。')) return;
+  await toggleAnchor(bucketId, false);
+  loadAnchorsView();
+}
+
+async function loadLetters() {
+  const filter = document.getElementById('letter-filter').value;
+  const list = document.getElementById('letters-list');
+  const cnt = document.getElementById('letter-count');
+  list.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px;">加载中…</div>';
+  try {
+    const url = BASE + '/api/letters' + (filter ? '?author=' + filter : '');
+    const r = await fetch(url);
+    const d = await r.json();
+    _lettersCache = d.letters || [];
+    cnt.textContent = _lettersCache.length + ' 封';
+    if (!_lettersCache.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:36px 0;">尚无信件</div>';
+      return;
+    }
+    list.innerHTML = _lettersCache.map(_renderLetter).join('');
+  } catch (e) {
+    list.innerHTML = '<div style="color:var(--negative);padding:18px;">加载失败：' + esc(e.message) + '</div>';
+  }
+}
+
+function _renderLetter(l) {
+  const who = l.author === 'user' ? (l.user_name || 'user') : 'claude';
+  const accentColor = l.author === 'claude' ? 'var(--accent)' : 'var(--text-dim)';
+  return `<article style="background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:18px 22px;box-shadow:4px 4px 10px var(--shadow-dark-subtle), -4px -4px 10px var(--shadow-light);" data-id="${l.id}">
+    <div style="font-size:11px;color:var(--text-dim);letter-spacing:0.15em;display:flex;justify-content:space-between;margin-bottom:8px;">
+      <span style="color:${accentColor};font-weight:600;">${esc(who)}</span><span>${esc(l.date || '')}</span>
+    </div>
+    ${l.title ? `<div style="font-family:'Cormorant Garamond', serif;font-size:17px;font-weight:600;margin-bottom:8px;color:var(--text);">${esc(l.title)}</div>` : ''}
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.75;color:var(--text);">${esc(l.content || '')}</div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;font-size:11px;">
+      <button onclick="editLetter('${l.id}')" style="padding:4px 12px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;">编辑</button>
+      <button onclick="deleteLetter('${l.id}')" style="padding:4px 12px;background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:2px;cursor:pointer;">删除</button>
+    </div>
+  </article>`;
+}
+
+async function sendLetter() {
+  const status = document.getElementById('letter-status');
+  status.style.color = 'var(--text-dim)';
+  status.textContent = '...';
+  const body = {
+    author: document.getElementById('letter-author').value,
+    user_name: document.getElementById('letter-username').value,
+    title: document.getElementById('letter-title').value,
+    date: document.getElementById('letter-date').value,
+    content: document.getElementById('letter-content').value,
+  };
+  if (!body.content.trim()) {
+    status.style.color = 'var(--negative)'; status.textContent = '内容为空';
+    return;
+  }
+  try {
+    const r = await fetch(BASE + '/api/letter', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = 'var(--accent)';
+      status.textContent = '✓ 已寄出 · ' + d.id;
+      document.getElementById('letter-content').value = '';
+      document.getElementById('letter-title').value = '';
+      loadLetters();
+    } else {
+      status.style.color = 'var(--negative)';
+      status.textContent = '✗ ' + (d.error || '失败');
+    }
+  } catch (e) {
+    status.style.color = 'var(--negative)';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+async function editLetter(id) {
+  const l = _lettersCache.find(x => x.id === id);
+  if (!l) { alert('未找到该信件'); return; }
+  const newTitle = prompt('标题（留空则不改）：', l.title || '');
+  if (newTitle === null) return;
+  const newDate = prompt('日期 YYYY-MM-DD（留空则不改）：', l.date || '');
+  if (newDate === null) return;
+  const newContent = prompt('内容（留空则不改）：', l.content || '');
+  if (newContent === null) return;
+  const body = {};
+  if (newTitle !== (l.title || '') && newTitle !== '') body.title = newTitle;
+  if (newDate !== (l.date || '') && newDate !== '') body.date = newDate;
+  if (newContent !== (l.content || '') && newContent.trim() !== '') body.content = newContent;
+  if (!Object.keys(body).length) { alert('未做任何修改'); return; }
+  if (!confirm('确认保存修改？')) return;
+  try {
+    const r = await fetch(BASE + '/api/letter/' + encodeURIComponent(id), {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) { alert('✓ 已更新'); loadLetters(); }
+    else { alert('✗ ' + (d.error || '更新失败')); }
+  } catch (e) { alert('✗ ' + e.message); }
+}
+
+async function deleteLetter(id) {
+  if (!confirm('⚠ 这将彻底删除这封信，文件不可恢复。确认删除？')) return;
+  if (!confirm('再次确认：你真的要永久删除这封信吗？')) return;
+  try {
+    const r = await fetch(BASE + '/api/letter/' + encodeURIComponent(id) + '?confirm=true', { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) { alert('已删除'); loadLetters(); }
+    else { alert('✗ ' + (d.error || '删除失败')); }
+  } catch (e) { alert('✗ ' + e.message); }
+}
+
+// 启动后挂载
+pollHeartbeat();
+maybeShowOnboarding();
+// 支持 #letters 锚点直达（老书签从 /letters → / #letters 时自动切换）
+if (location.hash === '#letters') {
+  const t = document.querySelector('.tab[data-tab="letters"]');
+  if (t) t.click();
+}
+
+// ── 给作者反馈 ──────────────────────────────────────────────
+async function openFeedback() {
+  const modal = document.getElementById('feedback-modal');
+  modal.style.display = 'flex';
+  document.getElementById('feedback-log-area').textContent = '加载中…';
+  try {
+    const r = await fetch(BASE + '/api/logs?limit=30');
+    const d = await r.json();
+    document.getElementById('feedback-log-area').textContent =
+      d.lines ? d.lines.join('\n') : (d.error || '（无日志）');
+  } catch (e) {
+    document.getElementById('feedback-log-area').textContent = '加载失败: ' + e.message;
+  }
+}
+function closeFeedback() {
+  document.getElementById('feedback-modal').style.display = 'none';
+}
+function copyFeedback() {
+  const type = document.getElementById('feedback-type').value;
+  const desc = document.getElementById('feedback-desc').value.trim();
+  const logs = document.getElementById('feedback-log-area').textContent;
+  const text = `问题类型: ${type}\n描述: ${desc || '（未填写）'}\n\n--- 最近日志（30条）---\n${logs}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('feedback-copy-btn');
+    btn.textContent = '✓ 已复制';
+    setTimeout(() => { btn.textContent = '一键复制'; }, 2000);
+  });
+}
+</script>
+
+<!-- 给作者反馈 Modal -->
+<div id="feedback-modal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);" onclick="if(event.target===this)closeFeedback()">
+  <div style="background:var(--surface-solid);border:1px solid var(--border);border-radius:4px;padding:28px 30px;width:min(600px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:600;color:var(--text);">给作者反馈</span>
+      <button onclick="closeFeedback()" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr;gap:10px 12px;align-items:center;font-size:13px;">
+      <label style="color:var(--text-dim);">问题类型</label>
+      <select id="feedback-type" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:2px;font-size:13px;">
+        <option>导入失败</option>
+        <option>工具不响应</option>
+        <option>记忆读写异常</option>
+        <option>界面显示错误</option>
+        <option>其他</option>
+      </select>
+      <label style="color:var(--text-dim);">描述</label>
+      <textarea id="feedback-desc" rows="3" placeholder="简单描述遇到了什么…" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:2px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+    <details>
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim);user-select:none;">最近 30 条日志（点击展开）</summary>
+      <pre id="feedback-log-area" style="font-size:11px;line-height:1.5;color:var(--text-dim);white-space:pre-wrap;word-break:break-all;max-height:220px;overflow-y:auto;margin-top:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:2px;"></pre>
+    </details>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button onclick="closeFeedback()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 16px;font-size:12px;cursor:pointer;">取消</button>
+      <button id="feedback-copy-btn" onclick="copyFeedback()" style="background:var(--accent);border:none;color:#fff;border-radius:2px;padding:6px 18px;font-size:12px;cursor:pointer;font-weight:600;">一键复制</button>
+    </div>
+  </div>
+</div>
+<!-- ============================================================
+     批量硬删确认 Modal（3 步确认）
+     仅用户操作，Claude 无法触发；删除后向 Claude 发送一次性通知
+     全程展示待删除桶列表
+     ============================================================ -->
+<div id="purge-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(44,42,38,0.6);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+  <div style="background:var(--surface-solid);border:1px solid var(--border-strong);border-radius:4px;max-width:520px;width:92%;padding:28px 28px 22px;box-shadow:0 8px 40px rgba(44,42,38,0.22);margin-bottom:40px;">
+
+    <!-- 待删除列表（全程显示） -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.3px;">即将永久删除以下记忆桶（<span id="purge-modal-count">0</span> 条）：</div>
+      <div id="purge-modal-list"
+        style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;padding:8px 10px;background:var(--bg);font-size:12px;line-height:1.9;color:var(--text);">
+      </div>
+    </div>
+
+    <!-- Step 1：勾选确认 -->
+    <div id="purge-step1">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:10px;">第 1 步 / 3 &nbsp;·&nbsp; 勾选确认</div>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text);line-height:1.7;">
+        <input type="checkbox" id="purge-chk-confirm" onchange="purgeCheckStep1()"
+          style="accent-color:var(--accent);margin-top:3px;flex-shrink:0;">
+        <span>我知道这是<strong>永久删除</strong>，文件将从磁盘上完全移除，任何人包括 Claude 都无法恢复。</span>
+      </label>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button onclick="closePurgeModal()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 16px;font-size:12px;cursor:pointer;">取消</button>
+        <button id="purge-next1" onclick="purgeGoStep2()" disabled
+          style="background:var(--accent);border:none;color:#fff;border-radius:2px;padding:6px 18px;font-size:12px;cursor:pointer;opacity:0.35;transition:opacity 0.2s;">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 2：手动输入 -->
+    <div id="purge-step2" style="display:none;">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:10px;">第 2 步 / 3 &nbsp;·&nbsp; 输入确认词</div>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px;line-height:1.6;">
+        在下方输入框中输入 <code style="background:var(--bg);padding:1px 6px;border-radius:2px;font-size:12px;">永久删除</code> 以继续：
+      </p>
+      <input id="purge-input2" type="text" autocomplete="off" placeholder="永久删除"
+        style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:2px;font-size:13px;font-family:inherit;margin-bottom:4px;"
+        oninput="purgeCheckStep2()">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
+        <button onclick="closePurgeModal()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 16px;font-size:12px;cursor:pointer;">取消</button>
+        <button id="purge-next2" onclick="purgeGoStep3()" disabled
+          style="background:var(--accent);border:none;color:#fff;border-radius:2px;padding:6px 18px;font-size:12px;cursor:pointer;opacity:0.35;transition:opacity 0.2s;">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 3：倒计时按钮 -->
+    <div id="purge-step3" style="display:none;">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:10px;">第 3 步 / 3 &nbsp;·&nbsp; 最终执行</div>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;">
+        此操作将立即开始，无法中断。按钮倒计时结束后方可点击。
+      </p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button onclick="closePurgeModal()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:6px 16px;font-size:12px;cursor:pointer;">取消</button>
+        <button id="purge-final-btn" onclick="executePurge()" disabled
+          style="background:var(--accent);border:none;color:#fff;border-radius:2px;padding:6px 22px;font-size:12px;cursor:not-allowed;opacity:0.4;min-width:110px;transition:opacity 0.2s;">
+          <span id="purge-countdown-label">确认删除 (5)</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Purge mode — 批量硬删（物理删除），仅用户可触发
+// ============================================================
+var _purgeMode = false;
+var _purgeCountdownTimer = null;
+
+function enterPurgeMode() {
+  // 切到记忆桶 tab，然后进入 purge 模式
+  var listTab = document.querySelector('.tab[data-tab="list"]');
+  if (listTab && !listTab.classList.contains('active')) listTab.click();
+  _purgeMode = true;
+  var tb = document.getElementById('purge-toolbar');
+  if (tb) { tb.style.display = 'flex'; }
+  renderBuckets(allBuckets || []);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function exitPurgeMode() {
+  _purgeMode = false;
+  var tb = document.getElementById('purge-toolbar');
+  if (tb) { tb.style.display = 'none'; }
+  renderBuckets(allBuckets || []);
+}
+
+function purgeToggleRow(row) {
+  var chk = row.querySelector('.purge-chk');
+  if (chk) { chk.checked = !chk.checked; purgeUpdateCount(); }
+}
+
+function purgeUpdateCount() {
+  var chks = document.querySelectorAll('.purge-chk:checked');
+  var n = chks.length;
+  var lbl = document.getElementById('purge-count-label');
+  var btn = document.getElementById('purge-exec-btn');
+  if (lbl) lbl.textContent = '已选 ' + n + ' 条';
+  if (btn) { btn.disabled = n === 0; btn.style.opacity = n > 0 ? '1' : '0.4'; }
+  var allChks = document.querySelectorAll('.purge-chk');
+  var sa = document.getElementById('purge-select-all');
+  if (sa && allChks.length > 0) sa.indeterminate = (n > 0 && n < allChks.length);
+  if (sa && allChks.length > 0) sa.checked = (n === allChks.length);
+}
+
+function purgeToggleAll(checked) {
+  document.querySelectorAll('.purge-chk').forEach(function(c) { c.checked = checked; });
+  purgeUpdateCount();
+}
+
+function getPurgeSelectedIds() {
+  var chks = document.querySelectorAll('.purge-chk:checked');
+  return Array.from(chks).map(function(c) { return c.getAttribute('data-id'); });
+}
+
+function getPurgeSelectedNames() {
+  var chks = document.querySelectorAll('.purge-chk:checked');
+  return Array.from(chks).map(function(c) {
+    return c.getAttribute('data-name') || c.getAttribute('data-id');
+  });
+}
+
+function openPurgeConfirm() {
+  var ids = getPurgeSelectedIds();
+  if (!ids.length) return;
+  var names = getPurgeSelectedNames();
+
+  // 更新 modal 内列表
+  document.getElementById('purge-modal-count').textContent = ids.length;
+  var listEl = document.getElementById('purge-modal-list');
+  listEl.innerHTML = names.map(function(n, i) {
+    return '<div style="padding:2px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="color:var(--text-dim);margin-right:8px;">' + (i + 1) + '.</span>' +
+      esc(n) + '</div>';
+  }).join('');
+
+  // 重置步骤状态
+  document.getElementById('purge-chk-confirm').checked = false;
+  document.getElementById('purge-input2').value = '';
+  document.getElementById('purge-next1').disabled = true;
+  document.getElementById('purge-next1').style.opacity = '0.35';
+  document.getElementById('purge-next2').disabled = true;
+  document.getElementById('purge-next2').style.opacity = '0.35';
+  document.getElementById('purge-step1').style.display = '';
+  document.getElementById('purge-step2').style.display = 'none';
+  document.getElementById('purge-step3').style.display = 'none';
+
+  if (_purgeCountdownTimer) { clearInterval(_purgeCountdownTimer); _purgeCountdownTimer = null; }
+
+  var modal = document.getElementById('purge-modal');
+  modal.style.display = 'flex';
+}
+
+function closePurgeModal() {
+  if (_purgeCountdownTimer) { clearInterval(_purgeCountdownTimer); _purgeCountdownTimer = null; }
+  document.getElementById('purge-modal').style.display = 'none';
+}
+
+// Step 1: checkbox
+function purgeCheckStep1() {
+  var ok = document.getElementById('purge-chk-confirm').checked;
+  var btn = document.getElementById('purge-next1');
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '0.35';
+}
+
+function purgeGoStep2() {
+  document.getElementById('purge-step1').style.display = 'none';
+  document.getElementById('purge-step2').style.display = '';
+  setTimeout(function() { document.getElementById('purge-input2').focus(); }, 80);
+}
+
+// Step 2: type "永久删除"
+function purgeCheckStep2() {
+  var v = document.getElementById('purge-input2').value.trim();
+  var ok = (v === '永久删除');
+  var btn = document.getElementById('purge-next2');
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '0.35';
+}
+
+function purgeGoStep3() {
+  document.getElementById('purge-step2').style.display = 'none';
+  document.getElementById('purge-step3').style.display = '';
+  // 5 秒倒计时
+  var sec = 5;
+  var label = document.getElementById('purge-countdown-label');
+  var finalBtn = document.getElementById('purge-final-btn');
+  label.textContent = '确认删除 (' + sec + ')';
+  finalBtn.disabled = true;
+  finalBtn.style.opacity = '0.4';
+  finalBtn.style.cursor = 'not-allowed';
+  _purgeCountdownTimer = setInterval(function() {
+    sec--;
+    if (sec > 0) {
+      label.textContent = '确认删除 (' + sec + ')';
+    } else {
+      clearInterval(_purgeCountdownTimer);
+      _purgeCountdownTimer = null;
+      label.textContent = '确认删除';
+      finalBtn.disabled = false;
+      finalBtn.style.opacity = '1';
+      finalBtn.style.cursor = 'pointer';
+    }
+  }, 1000);
+}
+
+async function executePurge() {
+  var ids = getPurgeSelectedIds();
+  if (!ids.length) { closePurgeModal(); return; }
+  var btn = document.getElementById('purge-final-btn');
+  var label = document.getElementById('purge-countdown-label');
+  label.textContent = '删除中…';
+  btn.disabled = true;
+  try {
+    var res = await fetch(BASE + '/api/buckets/purge', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Purge-Confirm': 'dashboard-purge-v1',
+      },
+      body: JSON.stringify({ ids: ids }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    closePurgeModal();
+    exitPurgeMode();
+    await loadBuckets();
+    var msg = '已永久删除 ' + data.deleted + ' 条记忆桶。Claude 将在下次工具调用时收到通知。';
+    if (data.failed && data.failed.length) msg += '\n未能删除：' + data.failed.join(', ');
+    alert(msg);
+  } catch (e) {
+    label.textContent = '确认删除';
+    btn.disabled = false;
+    alert('删除失败：' + e.message);
+  }
+}
+
+// ============================================================
+// Human name setting
+// ============================================================
+async function loadHumanName() {
+  try {
+    var res = await fetch(BASE + '/api/settings/human');
+    if (res.ok) {
+      var data = await res.json();
+      var el = document.getElementById('settings-human-name');
+      if (el) el.value = data.human || '';
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function saveHumanName() {
+  var el = document.getElementById('settings-human-name');
+  var msg = document.getElementById('settings-human-msg');
+  var name = (el ? el.value.trim() : '') || '人类';
+  try {
+    var res = await fetch(BASE + '/api/settings/human', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ human: name }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (msg) { msg.textContent = '已保存'; msg.style.color = 'var(--positive)'; }
+    setTimeout(function() { if (msg) msg.textContent = ''; }, 2000);
+  } catch (e) {
+    if (msg) { msg.textContent = '保存失败：' + e.message; msg.style.color = 'var(--negative)'; }
+  }
+}
+</script>
+
+</body>
+</html>

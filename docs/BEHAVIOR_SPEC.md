@@ -396,7 +396,7 @@ breath(importance_min=8)
 
 ### 场景 12：embedding 向量化检索场景（开启 embedding 时）
 
-**前提**：`config.yaml` 中 `embedding.enabled: true` 且 `OMBRE_API_KEY` 已配置
+**前提**：`config.yaml` 中 `embedding.enabled: true` 且 `OMBRE_EMBED_API_KEY` 已配置
 
 **embedding 介入的两个层次**：
 
@@ -425,6 +425,84 @@ CREATE TABLE embeddings (
 ```
 
 **相似度计算**：`_cosine_similarity(a, b)` = dot(a,b) / (|a| × |b|)
+
+---
+
+### 场景 13：plan 工具——计划/待办的写入与自动判定（iter 1.4）
+
+**前提**：plan 是独立桶类型 `bucket_type="plan"`，存放于 `{buckets_dir}/plans/active/`，自动打 `__plan__` 系统标签。
+
+#### 13a 写入 plan
+- 调用：`plan(content, status="active", related_bucket="")` 
+- `bucket_mgr.create()` 写入 `type="plan"`, `tags=["__plan__"]`, `importance=7`, `domain=["plan"]`, `status="active"`
+- decay：`decay_engine.calculate_score()` 检测到 `type=="plan"` 直接返回 50.0，**永不衰减**
+- 浮现：普通 `breath()` 排除 plan（exclude tuple 含 `"plan"`），不会推送
+- dream：返回末尾追加 `=== 你的 active plans ===` 段，列出所有 `type==plan && status==active` 的桶
+
+#### 13b 自动判定 resolve
+**触发点**：`hold()` 或 `grow()` 写入完成后，`asyncio.create_task(_check_plan_resolution(content, source_bucket_id))`
+
+**流程**（保守，宁漏报不误报）：
+1. 前置：`embedding_engine.enabled` 必须为 True，否则直接返回
+2. 拉取所有 `type==plan && status==active` 的桶
+3. 对新事件文本 `content` 调 `embedding_engine.search_similar(content, top_k=20)`，过滤出与 active plan 相关、相似度 **> 0.7** 的桶
+4. 对每个候选 plan：调 `dehydrator.judge_plan_resolution(plan_text, new_event_text)` 让 LLM 判定
+5. LLM 返回 `{resolved: bool, confidence: float, reason: str}`，仅在 `resolved=True && confidence >= 0.7` 时执行 `bucket_mgr.update(plan_id, status="resolved", resolution_reason=..., resolved_by=source_bucket_id)`
+6. 任何异常都吞掉（`try/except`），不影响 hold/grow 主流程返回
+
+#### 13c 手动改 status
+- `trace(bucket_id=plan_id, status="active"/"resolved"/"abandoned")` 直接写 frontmatter
+- 仅这三个值会被 bucket_manager 接收，其他静默忽略
+
+---
+
+### 场景 14：letter 工具——长信件（iter 1.4）
+
+**前提**：letter 是独立桶类型 `bucket_type="letter"`，存放于 `{buckets_dir}/letters/history/`，自动打 `__letter__` 系统标签。
+
+#### 14a 写信
+- 调用：`letter_write(author, content, user_name="", title="", date="")`
+- `author` 必须是 `"user"` 或 `"claude"`，其它返回错误
+- `bucket_mgr.create()` 写入 `type="letter"`, `tags=["__letter__"]`, `importance=10`, `domain=["letter"]`
+- 然后 `bucket_mgr.update()` 透传 author / user_name / title / letter_date 进 frontmatter
+- 自动生成 embedding 用于 `letter_read(query=...)` 语义检索
+
+#### 14b 读信
+- 调用：`letter_read(query="", limit=10, author="", date_from="", date_to="")`
+- 无 query：按 `letter_date` 或 `created` 倒序返回 `limit` 封
+- 有 query 且 embedding 启用：用向量相似度排序
+- 支持 author / date_from / date_to 过滤
+
+#### 14c 浮现规则
+- **普通 breath() 不浮现 letter**（exclude tuple 含 `"letter"`）
+- **SessionStart hook (`/breath-hook`)** 在主体浮现完成后**追加** `=== 最近的信 ===` 段，包含双方各最新一封（user→Claude + Claude→user）
+- letter 永不衰减、永不合并、原文永久保存
+
+#### 14d 独立页面
+- `GET /letters` → 301 → `/#letters`（letters UI 已合并进 dashboard 的「信」tab，原独立 letters.html 已下线）
+- `GET /api/letters` → JSON 列表（支持 `?author=user|claude`）
+- `POST /api/letter` → 从 dashboard 写信
+
+---
+
+### 场景 15：embedding 三后端切换（iter 1.4）
+
+**支持的 backend**：
+- `gemini`（默认，云 API，3072 维）
+- `bge-small-zh`（本地 100MB，512 维）
+- `bge-m3`（本地 2.2GB，1024 维）
+
+**优先级**（高→低）：
+1. 环境变量 `OMBRE_EMBED_BACKEND`
+2. `config.yaml` 的 `embedding.backend`
+3. 默认 `gemini`
+
+**Dashboard 设置**：`/api/config` GET 返回 `embedding.backend` + `backend_options[]`；POST 提交 `{embedding:{backend:"..."}}` 时白名单校验后热重载 `EmbeddingEngine`。
+
+**降级**：
+- backend=gemini 但无 API Key → `enabled=False`
+- backend=bge-* 但 `sentence-transformers` 未安装 → 调用时 `enabled=False` 并 `_st_model=None`，所有向量请求返回 `[]`，调用方 fallback 到 keyword 搜索
+- backend 字符串不在白名单 → `enabled=False`
 
 ---
 

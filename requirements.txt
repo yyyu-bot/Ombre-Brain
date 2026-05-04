@@ -14,12 +14,10 @@ openai>=1.0.0
 
 # YAML 配置解析
 pyyaml>=6.0
+types-PyYAML>=6.0
 
 # Markdown frontmatter 解析（桶文件读写）
 python-frontmatter>=1.1.0
-
-# 中文分词
-jieba>=0.42.1
 
 # 异步 HTTP 客户端（应用层保活 ping）
 httpx>=0.27.0
@@ -27,3 +25,12 @@ httpx>=0.27.0
 # 向量相似度计算 (导入模式/聚类)
 numpy>=1.24.0
 scikit-learn>=1.2.0
+
+# === 向量化后端 ===
+# 2.0.3 起：默认 backend=local（fastembed + bge-m3）。fastembed 是 ONNX 推理，
+# 不依赖 torch，安装只有 ~50MB；bge-m3 模型权重首次启动自动下载到 models/bge-m3/。
+# 若只走远程 API（embedding.backend=api），仍需要装 fastembed（包体积小，不占运行内存如果不调用）。
+fastembed>=0.4.0
+
+# === 已废弃：旧的 sentence-transformers 本地后端 ===
+# 2.0.3 不再推荐。requirements-local.txt 已棄用，仅保留作历史参考。

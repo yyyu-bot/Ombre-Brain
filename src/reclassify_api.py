@@ -1,7 +1,23 @@
 #!/usr/bin/env python3
 """
-用 API 重新打标未分类记忆桶，修正 domain/tags/name，移动到正确目录。
-用法: docker exec ombre-brain python3 /app/reclassify_api.py
+========================================
+reclassify_api.py — 重新打标「未分类」记忆桶的一次性脚本
+========================================
+
+历史遗留的、落在「未分类/」目录的记忆桶，调 LLM 重算 domain/tags/name，
+然后搬着那个桶去正确的 domain 目录。
+
+关键行为：
+- 扫描 dynamic / 未分类下所有 .md，逼一次 analyze
+- 只修改 frontmatter 和文件位置，不动正文
+- 幂等：已在正确位置的跳过
+
+不做什么（边界）：
+- 不做合并、不做衰减、不调整 importance
+- 不作为常驻服务运行，手动 docker exec 调用
+
+对外暴露：CLI 入口（python3 reclassify_api.py）
+========================================
 """
 import asyncio
 import os
@@ -56,7 +72,7 @@ async def reclassify():
     cfg = load_config()
     dehy = cfg.get("dehydration", {})
     client = AsyncOpenAI(
-        api_key=os.environ.get("OMBRE_API_KEY", "") or dehy.get("api_key", ""),
+        api_key=os.environ.get("OMBRE_COMPRESS_API_KEY", "") or dehy.get("api_key", ""),
         base_url=dehy.get("base_url", "https://api.deepseek.com/v1"),
         timeout=60.0,
     )

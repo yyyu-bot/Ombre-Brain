@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 """
-Ombre Brain 手动记忆写入工具
-用途：在 Copilot 端直接写入记忆文件，绕过 MCP 和 API 调用
-用法：
-  python3 write_memory.py --name "记忆名" --content "内容" --domain "情感" --tags "标签1,标签2"
-  或交互模式：python3 write_memory.py
+========================================
+write_memory.py — 手动写入记忆的命令行小工具
+========================================
+
+不走 MCP、不走 HTTP，直接把一条记忆写成一个 .md 文件。
+主要用于调试 / 在 Copilot 端快速补东西 / API 不可用时的底圈。
+
+关键行为：
+- 两种用法：命令行参数、或交互 input
+- 路径优先级：OMBRE_BUCKETS_DIR > config.yaml > 内置默认
+- 必填：name / content；可选：domain / tags / valence / arousal / importance
+- 写入 dynamic/ 目录，生成 12 位 hex bucket_id
+
+不做什么（边界）：
+- 不调 LLM、不做 analyze、不做合并查重
+- 不启动 BucketManager，直接拼 frontmatter 写文件
+- 不同步 embedding（后台 decay/打分下次读到会补）
+
+对外暴露：CLI 入口。
+========================================
 """
 
 import os

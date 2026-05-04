@@ -4,7 +4,7 @@ Backfill embeddings for existing buckets.
 为存量桶批量生成 embedding。
 
 Usage:
-    OMBRE_BUCKETS_DIR=/data OMBRE_API_KEY=xxx python backfill_embeddings.py [--batch-size 20] [--dry-run]
+    OMBRE_BUCKETS_DIR=/data OMBRE_EMBED_API_KEY=xxx python backfill_embeddings.py [--batch-size 20] [--dry-run]
 
 Each batch calls Gemini embedding API once per bucket.
 Free tier: 1500 requests/day, so ~75 batches of 20.
@@ -12,9 +12,10 @@ Free tier: 1500 requests/day, so ~75 batches of 20.
 
 import asyncio
 import argparse
+import os
 import sys
 
-sys.path.insert(0, ".")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 from utils import load_config
 from bucket_manager import BucketManager
 from embedding_engine import EmbeddingEngine
