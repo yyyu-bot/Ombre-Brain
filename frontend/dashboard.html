@@ -359,13 +359,13 @@
     margin-bottom: 16px;
     letter-spacing: 0.3px;
   }
-  .config-row {
+  .config-row, .form-row {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
   }
-  .config-row label {
+  .config-row label, .form-row label {
     width: 110px;
     font-size: 12px;
     color: var(--text-dim);
@@ -373,7 +373,8 @@
     font-weight: 500;
     letter-spacing: 0.2px;
   }
-  .config-row input, .config-row select {
+  .config-row input, .config-row select,
+  .form-row input, .form-row select {
     flex: 1;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -385,7 +386,8 @@
     transition: all 0.25s ease;
     box-shadow: inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);
   }
-  .config-row input:focus, .config-row select:focus {
+  .config-row input:focus, .config-row select:focus,
+  .form-row input:focus, .form-row select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-glow), inset 2px 2px 4px var(--shadow-dark-subtle);
@@ -657,8 +659,8 @@
     .bucket-row .time,
     .bucket-row .preview { display: none; }
     .detail-panel { width: 100%; }
-    .config-row { flex-wrap: wrap; }
-    .config-row label { width: 100%; }
+    .config-row, .form-row { flex-wrap: wrap; }
+    .config-row label, .form-row label { width: 100%; }
     .breath-flow { display: none; }
   }
 
@@ -766,7 +768,8 @@
 
   /* ============ 输入 / 下拉 / 文本域：统一内凹 LCD 输入槽 ============ */
   input[type=text], input[type=password], input[type=number], input[type=date],
-  select, textarea, .config-row input, .config-row select, .breath-controls input {
+  select, textarea, .config-row input, .config-row select,
+  .form-row input, .form-row select, .breath-controls input {
     border: none !important;
     border-radius: 11px !important;
     background: var(--surface-solid) !important;
@@ -1067,6 +1070,32 @@
   .icon-ok  { color: var(--positive, #2a9d3f); }
   .icon-err { color: var(--negative); }
   .icon-warn { color: var(--warning, #b89962); }
+  /* Model-list dropdown panel */
+  .model-list-dropdown {
+    display: none;
+    margin: -8px 0 8px 122px;
+    max-height: 140px;
+    overflow-y: auto;
+    font-size: 12px;
+    border-radius: 11px;
+    background: var(--surface-solid);
+    box-shadow: 4px 4px 12px var(--shadow-dark-subtle), -3px -3px 8px var(--shadow-light), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  /* Progress bar — neumorphic inset track */
+  .progress-track {
+    height: 8px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--surface-solid);
+    box-shadow: inset 2px 2px 5px var(--shadow-dark-subtle), inset -1px -1px 4px var(--shadow-light);
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-light), var(--accent));
+    border-radius: 20px;
+    transition: width .3s ease;
+    width: 0%;
+  }
 </style>
 </head>
 <body>
@@ -1275,8 +1304,8 @@
         <span id="import-status-text">准备中…</span>
         <span id="import-progress-text">0/0</span>
       </div>
-      <div style="background:var(--surface);border-radius:8px;height:12px;overflow:hidden;">
-        <div id="import-progress-bar" style="height:100%;background:var(--accent);border-radius:8px;transition:width .3s;width:0%;"></div>
+      <div class="progress-track">
+        <div id="import-progress-bar" class="progress-fill"></div>
       </div>
       <div style="display:flex;gap:16px;margin-top:8px;font-size:13px;color:var(--text-dim);">
         <span>API调用: <b id="import-api-calls">0</b></span>
@@ -1330,7 +1359,7 @@
         <button class="btn-secondary" onclick="loadLogs()" style="padding:8px 18px;font-size:12px;">刷新</button>
         <span id="logs-meta" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
       </div>
-      <pre id="logs-output" style="background:var(--bg);color:var(--text);padding:16px;border-radius:2px;font-size:11px;max-height:60vh;overflow:auto;line-height:1.55;white-space:pre-wrap;word-break:break-all;border:1px solid var(--border);box-shadow:inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);font-family:'SF Mono', Menlo, Consolas, monospace;">点击刷新加载日志…</pre>
+      <pre id="logs-output" style="background:var(--surface-solid);color:var(--text);padding:16px;border-radius:11px;font-size:11px;max-height:60vh;overflow:auto;line-height:1.55;white-space:pre-wrap;word-break:break-all;box-shadow:inset 2px 2px 5px var(--shadow-dark-subtle),inset -2px -2px 4px var(--shadow-light);font-family:'SF Mono', Menlo, Consolas, monospace;">点击刷新加载日志…</pre>
       <div style="margin-top:8px;font-size:11px;color:var(--text-light);">server.log 末尾最多 500 行。</div>
     </div>
 
@@ -1532,7 +1561,7 @@
         </details>
 
         <!-- Status indicator (top) -->
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--surface-solid);border-radius:8px;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--surface-solid);border-radius:11px;box-shadow:4px 4px 10px var(--shadow-dark-subtle),-3px -3px 8px var(--shadow-light);">
           <span id="tunnel-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--text-dim);flex-shrink:0;transition:background 0.3s;"></span>
           <span id="tunnel-status-text" style="font-size:12px;color:var(--text-dim);flex:1;">未运行</span>
           <button id="tunnel-toggle-btn" class="btn-primary" onclick="toggleTunnel()" style="padding:4px 12px;font-size:12px;">启动</button>
@@ -1611,7 +1640,7 @@
           <input type="text" id="cfg-dehy-model" placeholder="gemini-2.5-flash-lite" style="flex:1;" />
           <button type="button" onclick="fetchModels('dehy')" style="margin-left:6px;padding:6px 10px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
         </div>
-        <div id="cfg-dehy-model-list" style="display:none;margin:-8px 0 8px 122px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface);"></div>
+        <div id="cfg-dehy-model-list" class="model-list-dropdown"></div>
         <div class="config-row" id="cfg-dehy-url-row"><label>Base URL</label><input type="text" id="cfg-dehy-url" placeholder="https://..." /></div>
         <div class="config-row" style="align-items:center;">
           <label>API Key</label>
@@ -1670,7 +1699,7 @@
           <input type="text" id="cfg-emb-model" placeholder="gemini-embedding-001" style="flex:1;" />
           <button type="button" onclick="fetchModels('emb')" style="margin-left:6px;padding:6px 10px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
         </div>
-        <div id="cfg-emb-model-list" style="display:none;margin:-8px 0 8px 122px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface);"></div>
+        <div id="cfg-emb-model-list" class="model-list-dropdown"></div>
         <div style="margin-top:10px;padding:10px 12px;border:1px dashed var(--border,#ddd);border-radius:6px;">
           <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">
             切换后端不会自动重算已有向量。若要让旧向量与新后端对齐，请显式触发迁移。
@@ -1778,7 +1807,7 @@
           <input type="text" id="env-compress-model" placeholder="例：deepseek-chat" style="font-family:monospace;flex:1;" />
           <button type="button" onclick="fetchModels('env-compress')" style="margin-left:6px;padding:5px 9px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
         </div>
-        <div id="env-compress-model-list" style="display:none;margin:-8px 0 8px 108px;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface);"></div>
+        <div id="env-compress-model-list" class="model-list-dropdown" style="margin-left:122px;"></div>
         <div class="form-row">
           <label>格式</label>
           <select id="env-compress-format">
@@ -1871,13 +1900,13 @@
       <!-- 生成的链接预览 -->
       <div style="margin-bottom:16px;">
         <div style="font-weight:600;font-size:13px;margin-bottom:8px;">端点地址</div>
-        <div style="background:var(--surface-solid);border:1px solid var(--border);border-radius:4px;padding:12px 14px;font-family:monospace;font-size:12px;line-height:2;">
+        <div style="background:var(--surface-solid);border-radius:11px;padding:12px 14px;font-family:monospace;font-size:12px;line-height:2;box-shadow:inset 2px 2px 5px var(--shadow-dark-subtle),inset -2px -2px 4px var(--shadow-light);">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <span style="color:var(--text-dim);font-size:11px;min-width:60px;">主 /mcp</span>
             <span id="mcp-url-main" style="flex:1;color:var(--text);word-break:break-all;"></span>
             <button onclick="copyMcpUrl('main')" style="padding:3px 10px;font-size:11px;white-space:nowrap;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);">复制</button>
           </div>
-          <div style="border-top:1px solid var(--border);margin:6px 0;"></div>
+          <div style="border-top:1px solid rgba(150,138,116,0.12);margin:6px 0;"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <span style="color:var(--text-dim);font-size:11px;min-width:60px;">副 /mcp-extra</span>
             <span id="mcp-url-extra" style="flex:1;color:var(--text);word-break:break-all;"></span>
@@ -1895,7 +1924,7 @@
 
       <details style="margin-top:16px;">
         <summary style="cursor:pointer;font-size:12px;color:var(--text-dim);">查看完整 JSON 预览</summary>
-        <pre id="mcp-json-preview" style="margin-top:8px;padding:12px;background:var(--surface-solid);border:1px solid var(--border);border-radius:4px;font-size:11px;line-height:1.6;overflow-x:auto;color:var(--text);white-space:pre-wrap;word-break:break-all;"></pre>
+        <pre id="mcp-json-preview" style="margin-top:8px;padding:12px;background:var(--surface-solid);border-radius:11px;font-size:11px;line-height:1.6;overflow-x:auto;color:var(--text);white-space:pre-wrap;word-break:break-all;box-shadow:inset 2px 2px 5px var(--shadow-dark-subtle),inset -2px -2px 4px var(--shadow-light);"></pre>
       </details>
     </div>
 
@@ -1947,7 +1976,7 @@
 
       <div id="gh-msg" style="margin-top:12px;font-size:12px;min-height:18px;"></div>
 
-      <div id="gh-status-box" style="margin-top:14px;padding:10px 14px;border:1px solid var(--border);border-radius:6px;font-size:12px;display:none;">
+      <div id="gh-status-box" style="margin-top:14px;padding:10px 14px;border-radius:11px;font-size:12px;display:none;background:var(--surface-solid);box-shadow:4px 4px 10px var(--shadow-dark-subtle),-3px -3px 8px var(--shadow-light);">
         <div style="font-weight:600;margin-bottom:6px;">同步状态</div>
         <div>仓库：<span id="gh-st-repo">—</span></div>
         <div>分支：<span id="gh-st-branch">—</span></div>
@@ -2002,7 +2031,7 @@
 
           <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button class="btn-primary" id="migrate-apply-btn" onclick="applyMigrate()" style="display:inline-flex;align-items:center;gap:6px;"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg> 开始导入</button>
-            <button onclick="resetMigrate()" style="font-size:12px;padding:4px 12px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-dim);">取消</button>
+            <button class="btn-secondary" onclick="resetMigrate()" style="font-size:12px;padding:4px 12px;">取消</button>
           </div>
         </div>
 
@@ -2012,8 +2041,8 @@
             <span id="migrate-phase-text" style="color:var(--text-dim);">准备中…</span>
             <span id="migrate-count-text"></span>
           </div>
-          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin-bottom:8px;">
-            <div id="migrate-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width .3s;border-radius:4px;"></div>
+          <div class="progress-track" style="margin-bottom:8px;">
+            <div id="migrate-progress-bar" class="progress-fill"></div>
           </div>
           <div id="migrate-result-text" style="font-size:12px;color:var(--text-dim);"></div>
           <div id="migrate-errors-text" style="font-size:11px;color:var(--negative);max-height:80px;overflow-y:auto;margin-top:4px;white-space:pre-line;"></div>
@@ -2433,7 +2462,7 @@ async function fetchModels(section) {
     }
     listEl.innerHTML = d.models.map(function(m) {
       var safe = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return '<div style="padding:5px 10px;cursor:pointer;border-bottom:1px solid var(--border);" ' +
+      return '<div style="padding:5px 10px;cursor:pointer;border-bottom:1px solid rgba(150,138,116,0.12);" ' +
         'onmouseenter="this.style.background=\'var(--accent-glow)\'" ' +
         'onmouseleave="this.style.background=\'\'" ' +
         'onclick="document.getElementById(\'' + modelInputId + '\').value=\'' + safe + '\';document.getElementById(\'' + listId + '\').style.display=\'none\';">' +
