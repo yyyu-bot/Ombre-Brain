@@ -384,15 +384,17 @@ def extract_wikilinks(text: str) -> list[str]:
 def get_version() -> str:
     """Read project version from `<repo_root>/VERSION`.
 
-    版本号唯一真源：根目录 VERSION 文件。每次发版只改这个文件 + git tag。
-    src/VERSION 只是 Docker 镜像内的 fallback 副本（见 Dockerfile）。
+    存在两份 VERSION：src/VERSION 与根目录 VERSION。读取顺序：src/VERSION 优先。
     任何路径都读不到时返回 "0.0.0+unknown"，方便排查。
 
-    ⚠️ 读取顺序：根目录 VERSION 优先，src/VERSION 兜底。
-    历史坑：原来先读 src/VERSION，于是发版只改根 VERSION、漏改 src/VERSION 时
-    （或热更新只覆盖 src/ 拉到旧 src/VERSION 时）会出现「代码已更新、版本号原地不动」。
-    改为根目录优先后，根 VERSION 成为唯一真源；热更新也会强制把两处刷成一致
-    （见 web/meta.py do-update），双保险。
+    ⚠️ 为什么是 src 优先（别再改成根目录优先）：
+      热更新（web/meta.py do-update）解压时只覆盖 src/ 和 frontend/，所以 src/VERSION
+      一定被刷新，而很多用户的根目录 VERSION 是历史安装遗留的老版本（从没人读、也没人更）。
+      若改成根目录优先，用户一更新就会读到那个尘封的旧根 VERSION → 版本号当场倒退
+      （2.3.10 真踩过：有人从 2.3.8 更新后显示成 2.1.3）。
+      一致性由 do-update「强制把 zip 的根 VERSION 同写到两处」保证；这里只管读那个
+      最可靠新鲜的 src/VERSION。
+      发版请同时 bump 两个 VERSION（根 + src/）。
 
     Python 小知识：
       * `with open(...) as f:` 是「上下文管理器」，离开 with 块自动关文件
@@ -401,10 +403,10 @@ def get_version() -> str:
         比裸 `except:` 安全，比 `except FileNotFoundError` 全面
     """
     candidates = [
-        # 唯一真源：项目根目录 VERSION（Docker 里由 Dockerfile COPY 进 /app/VERSION）
-        os.path.join(_project_root(), "VERSION"),
-        # fallback：src/ 旁的副本（旧 Docker bind-mount 布局 / 根 VERSION 缺失时兜底）
+        # 优先：src/ 旁的副本——热更新一定会刷新它，最可靠新鲜
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"),
+        # fallback：项目根目录 VERSION（Docker 里由 Dockerfile COPY 进 /app/VERSION）
+        os.path.join(_project_root(), "VERSION"),
     ]
     for path in candidates:
         try:
